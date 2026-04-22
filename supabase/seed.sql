@@ -1,0 +1,2 @@
+-- Intentionally empty for the first production slice.
+-- Add seed data here only if you want deterministic local Supabase fixtures.

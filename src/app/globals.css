@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4eadb;
+  --foreground: #112039;
+  --color-surface: #fff9f1;
+  --color-surface-strong: #fffefb;
+  --color-muted: #5c6475;
+  --color-border: #decfbe;
+  --color-accent: #dd6b3f;
+  --color-accent-secondary: #2f8b73;
+  --color-danger: #bb4f3b;
+  --color-warning: #b37a2a;
+  --color-shadow: rgba(17, 32, 57, 0.12);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-space-grotesk);
+  --font-mono: var(--font-plex-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  background-image:
+    radial-gradient(circle at top left, rgba(255, 235, 196, 0.95), transparent 24%),
+    radial-gradient(circle at top right, rgba(167, 204, 255, 0.5), transparent 24%),
+    linear-gradient(180deg, #f6ecde 0%, #f1e8dc 100%);
+  font-family: var(--font-space-grotesk), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(221, 107, 63, 0.22);
+}
+
+.soft-panel {
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-strong) 88%, white 12%);
+  box-shadow: 0 14px 45px var(--color-shadow);
+}
+
+.dotted-grid {
+  background-image: radial-gradient(rgba(17, 32, 57, 0.08) 0.8px, transparent 0.8px);
+  background-position: 0 0;
+  background-size: 18px 18px;
+}
