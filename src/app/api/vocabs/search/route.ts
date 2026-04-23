@@ -1,25 +1,19 @@
 import { NextResponse } from "next/server";
 import { type DictionaryEntry } from "@/lib/app-types";
 import { lookupMerriamEntry } from "@/lib/merriam";
-import { mapProfileRowToState, mapVocabRowToPersistedItem } from "@/lib/persisted-state";
+import {
+  attachReviewState,
+  mapProfileRowToState,
+  mapVocabRowToPersistedItem,
+  type VocabRow,
+} from "@/lib/persisted-state";
 import { normalizeQuery } from "@/lib/mock-state";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
-
-type VocabRow = {
-  id: string;
-  original_query: string;
-  canonical_term: string;
-  normalized_term: string;
-  definition: string;
-  example_sentence: string | null;
-  part_of_speech: string | null;
-  pronunciations: unknown;
-  notes: string | null;
-  status: "active" | "archived";
-  search_count: number;
-  last_searched_at: string;
-  created_at: string;
-};
+import {
+  createFallbackReviewState,
+  fetchCardForVocabItem,
+  fetchReviewStateForCard,
+} from "@/lib/supabase/review-data";
 
 async function lookupEntry(query: string): Promise<DictionaryEntry | null> {
   const apiKey = process.env.MERRIAM_API_KEY;
@@ -28,6 +22,29 @@ async function lookupEntry(query: string): Promise<DictionaryEntry | null> {
   }
 
   return lookupMerriamEntry(query, apiKey);
+}
+
+async function buildReviewBackedVocab(
+  userId: string,
+  supabase: Awaited<ReturnType<typeof getAuthenticatedContext>>["supabase"],
+  row: VocabRow,
+) {
+  if (!supabase) {
+    return attachReviewState(
+      mapVocabRowToPersistedItem(row),
+      createFallbackReviewState(row.created_at),
+    );
+  }
+
+  const card = await fetchCardForVocabItem(supabase, userId, row.id);
+  const reviewState = card
+    ? await fetchReviewStateForCard(supabase, card.id)
+    : createFallbackReviewState(row.created_at);
+
+  return attachReviewState(
+    mapVocabRowToPersistedItem(row),
+    reviewState ?? createFallbackReviewState(row.created_at),
+  );
 }
 
 export async function POST(request: Request) {
@@ -126,7 +143,7 @@ export async function POST(request: Request) {
         outcome:
           updated.status === "active" ? "existing_active" : "existing_archived",
         entry,
-        vocab: mapVocabRowToPersistedItem(updated),
+        vocab: await buildReviewBackedVocab(user.id, supabase, updated),
         message:
           updated.status === "active"
             ? "Already in the active vocab list. Search count and freshness were updated."
@@ -184,7 +201,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       outcome: "saved",
       entry,
-      vocab: mapVocabRowToPersistedItem(created),
+      vocab: await buildReviewBackedVocab(user.id, supabase, created),
       message: "Saved and synced to Supabase. Definition data came from Merriam-Webster.",
       profile: mapProfileRowToState(profile),
     });

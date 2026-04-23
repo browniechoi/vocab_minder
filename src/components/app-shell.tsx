@@ -25,10 +25,10 @@ export function AppShell({
                 </span>
                 <div>
                   <p className="text-lg font-semibold text-[color:var(--color-foreground)]">
-                    Vocab
+                    VocabMinder
                   </p>
                   <p className="text-sm text-[color:var(--color-muted)]">
-                    Search. Auto-save. Review.
+                    Look up. Keep. Review.
                   </p>
                 </div>
               </Link>
@@ -81,9 +81,9 @@ export function AppShell({
 
         <footer className="mt-4 border-t border-[color:var(--color-border)] px-1 pt-4 text-sm text-[color:var(--color-muted)]">
           {remotePersistenceEnabled
-            ? "Signed-in mode now syncs your vocab library and plan state to Supabase. Review progress still stays in this browser for now."
+            ? "Signed-in mode syncs vocabulary, review state, and review history through Supabase."
             : authConfigured
-              ? "Guest mode still runs locally. Sign in to sync your vocab library and plan state to Supabase."
+              ? "Guest mode still runs locally. Sign in to sync vocabulary and review progress through Supabase."
               : "Supabase env is still missing, so the app stays in local preview mode until the hosted project variables are configured."}
         </footer>
       </div>

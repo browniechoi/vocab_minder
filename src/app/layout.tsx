@@ -18,7 +18,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vocab",
+  title: "VocabMinder",
   description:
     "A cloud-ready English vocabulary app with automatic saving, usage caps, and Anki-style review.",
 };

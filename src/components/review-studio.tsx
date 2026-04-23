@@ -19,10 +19,24 @@ const ratingTone: Record<ReviewRating, string> = {
 
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday } = useAppState();
+  const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
-  const current = dueItems[0];
-  const nextUp = dueItems.slice(1, 4);
+  const dueItemIds = new Set(dueItems.map((item) => item.id));
+  const activeDeferredAgainIds = deferredAgainIds.filter((id) => dueItemIds.has(id));
+  const deferredAgainIdSet = new Set(activeDeferredAgainIds);
+  const deferredAgainItems = activeDeferredAgainIds.flatMap((id) => {
+    const item = dueItems.find((candidate) => candidate.id === id);
+    return item ? [item] : [];
+  });
+  const sessionQueue = [
+    ...dueItems.filter((item) => !deferredAgainIdSet.has(item.id)),
+    ...deferredAgainItems,
+  ];
+
+  const current = sessionQueue[0];
+  const nextUp = sessionQueue.slice(1, 4);
 
   if (!current) {
     return (
@@ -46,7 +60,7 @@ export function ReviewStudio() {
           </p>
           <p className="mt-3 text-4xl font-semibold">{reviewsToday}</p>
           <p className="mt-2 text-sm leading-7 text-[color:var(--color-muted)]">
-            Reviews logged today in the local review session for this browser.
+            Reviews logged today for the active account.
           </p>
         </div>
       </div>
@@ -103,18 +117,32 @@ export function ReviewStudio() {
           <button
             type="button"
             onClick={() => setRevealed(true)}
+            disabled={isSubmitting}
             className="rounded-full bg-[color:var(--color-foreground)] px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
           >
-            Reveal answer
+            {isSubmitting ? "Saving..." : "Reveal answer"}
           </button>
           {(["again", "hard", "good", "easy"] as ReviewRating[]).map((rating) => (
             <button
               key={rating}
               type="button"
-              disabled={!revealed}
-              onClick={() => {
-                answerCard(current.id, rating);
-                setRevealed(false);
+              disabled={!revealed || isSubmitting}
+              onClick={async () => {
+                const currentId = current.id;
+                setIsSubmitting(true);
+                try {
+                  await answerCard(currentId, rating);
+                  setDeferredAgainIds((currentIds) => {
+                    const remainingIds = currentIds.filter((id) => id !== currentId);
+                    if (rating === "again") {
+                      remainingIds.push(currentId);
+                    }
+                    return remainingIds;
+                  });
+                  setRevealed(false);
+                } finally {
+                  setIsSubmitting(false);
+                }
               }}
               className={`rounded-full border px-5 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${ratingTone[rating]}`}
             >

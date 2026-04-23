@@ -6,20 +6,19 @@ import {
   type DictionaryEntry,
   type PersistedVocabItem,
   type ProfileState,
-  type ReviewCache,
+  type ReviewEvent,
   type ReviewRating,
+  type ReviewState,
   type SearchOutcome,
   type VocabItem,
 } from "@/lib/app-types";
 import {
   attachReviewState,
-  buildReviewCache,
   createEmptyState,
-  mergePersistedItemsWithReviewCache,
 } from "@/lib/persisted-state";
 import { createSeedState, createVocabItem, normalizeQuery } from "@/lib/mock-state";
 import { PLAN_LIMITS } from "@/lib/plan";
-import { getPreviewStorageKey, getReviewStorageKey } from "@/lib/preview-config";
+import { getPreviewStorageKey } from "@/lib/preview-config";
 import { applyReview, isDue } from "@/lib/review";
 
 type SearchResult = {
@@ -36,14 +35,15 @@ type DictionaryLookupResponse = {
 };
 
 type BootstrapResponse = {
-  items: PersistedVocabItem[];
+  items: VocabItem[];
   profile: ProfileState;
+  reviewEvents: ReviewEvent[];
 };
 
 type RemoteSearchResponse = {
   outcome: SearchOutcome;
   entry: DictionaryEntry | null;
-  vocab: PersistedVocabItem | null;
+  vocab: VocabItem | null;
   message: string;
   profile: ProfileState;
 };
@@ -60,6 +60,11 @@ type RemoteRestoreResponse = {
   vocab?: PersistedVocabItem | null;
 };
 
+type RemoteReviewAnswerResponse = {
+  reviewEvent: ReviewEvent;
+  reviewState: ReviewState;
+};
+
 type AppStateContextValue = {
   state: AppState;
   activeItems: VocabItem[];
@@ -72,9 +77,9 @@ type AppStateContextValue = {
   archiveItem: (id: string) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<{ success: boolean; message: string }>;
-  answerCard: (id: string, rating: ReviewRating) => void;
+  answerCard: (id: string, rating: ReviewRating) => Promise<void>;
   setPlanTier: (planTier: AppState["planTier"]) => Promise<void>;
-  resetDemo: () => void;
+  resetDemo: () => Promise<void>;
 };
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
@@ -106,49 +111,6 @@ function readFullPreviewState(storageKey: string) {
   } catch {
     return null;
   }
-}
-
-function readReviewCache(reviewStorageKey: string): ReviewCache {
-  try {
-    const stored = window.localStorage.getItem(reviewStorageKey);
-    if (!stored) {
-      return {
-        reviewStates: {},
-        reviewEvents: [],
-      };
-    }
-
-    const parsed = JSON.parse(stored) as Partial<ReviewCache>;
-    return {
-      reviewStates:
-        parsed.reviewStates && typeof parsed.reviewStates === "object"
-          ? parsed.reviewStates
-          : {},
-      reviewEvents: Array.isArray(parsed.reviewEvents) ? parsed.reviewEvents : [],
-    };
-  } catch {
-    return {
-      reviewStates: {},
-      reviewEvents: [],
-    };
-  }
-}
-
-function buildCloudBackedState(
-  profile: ProfileState,
-  items: PersistedVocabItem[],
-  reviewCache: ReviewCache,
-): AppState {
-  const knownIds = new Set(items.map((item) => item.id));
-
-  return {
-    planTier: profile.planTier,
-    activeLimit: profile.activeLimit,
-    items: mergePersistedItemsWithReviewCache(items, reviewCache),
-    reviewEvents: reviewCache.reviewEvents.filter((event) =>
-      knownIds.has(event.vocabItemId),
-    ),
-  };
 }
 
 function upsertItem(items: VocabItem[], nextItem: VocabItem) {
@@ -211,7 +173,6 @@ export function AppStateProvider({
   const canPersistRef = useRef(false);
   const pronunciationRefreshRef = useRef(new Set<string>());
   const previewStorageKey = getPreviewStorageKey(storageScope);
-  const reviewStorageKey = getReviewStorageKey(storageScope);
 
   useEffect(() => {
     let frameId: number | null = null;
@@ -256,9 +217,13 @@ export function AppStateProvider({
           return;
         }
 
-        const reviewCache = readReviewCache(reviewStorageKey);
         canPersistRef.current = true;
-        setState(buildCloudBackedState(payload.profile, payload.items, reviewCache));
+        setState({
+          planTier: payload.profile.planTier,
+          activeLimit: payload.profile.activeLimit,
+          items: payload.items,
+          reviewEvents: payload.reviewEvents,
+        });
       } catch {
         if (!cancelled) {
           canPersistRef.current = true;
@@ -273,23 +238,19 @@ export function AppStateProvider({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [previewStorageKey, remotePersistenceEnabled, reviewStorageKey]);
+  }, [previewStorageKey, remotePersistenceEnabled]);
 
   useEffect(() => {
     if (!canPersistRef.current) {
       return;
     }
 
-    if (!remotePersistenceEnabled) {
-      window.localStorage.setItem(previewStorageKey, JSON.stringify(state));
+    if (remotePersistenceEnabled) {
       return;
     }
 
-    window.localStorage.setItem(
-      reviewStorageKey,
-      JSON.stringify(buildReviewCache(state)),
-    );
-  }, [previewStorageKey, remotePersistenceEnabled, reviewStorageKey, state]);
+    window.localStorage.setItem(previewStorageKey, JSON.stringify(state));
+  }, [previewStorageKey, remotePersistenceEnabled, state]);
 
   useEffect(() => {
     if (remotePersistenceEnabled || !canPersistRef.current) {
@@ -539,21 +500,14 @@ export function AppStateProvider({
         }
 
         const remotePayload = payload as RemoteSearchResponse;
-        let resultVocab: VocabItem | null = null;
 
         setState((current) => {
           let nextState = applyProfileState(current, remotePayload.profile);
 
           if (remotePayload.vocab) {
-            resultVocab = attachReviewState(
-              remotePayload.vocab,
-              current.items.find((item) => item.id === remotePayload.vocab?.id)
-                ?.reviewState,
-            );
-
             nextState = {
               ...nextState,
-              items: upsertItem(nextState.items, resultVocab),
+              items: upsertItem(nextState.items, remotePayload.vocab),
             };
           }
 
@@ -563,7 +517,7 @@ export function AppStateProvider({
         return {
           outcome: remotePayload.outcome,
           entry: remotePayload.entry,
-          vocab: resultVocab,
+          vocab: remotePayload.vocab,
           message: remotePayload.message,
         };
       } catch {
@@ -708,7 +662,46 @@ export function AppStateProvider({
         };
       }
     },
-    answerCard(id, rating) {
+    async answerCard(id, rating) {
+      if (remotePersistenceEnabled) {
+        try {
+          const response = await fetch("/api/review/answer", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ rating, vocabItemId: id }),
+          });
+          const payload = (await response.json()) as
+            | RemoteReviewAnswerResponse
+            | { message?: string };
+
+          if (
+            !response.ok ||
+            !("reviewEvent" in payload) ||
+            !("reviewState" in payload)
+          ) {
+            return;
+          }
+
+          setState((current) => ({
+            ...current,
+            items: current.items.map((item) =>
+              item.id === id
+                ? { ...item, reviewState: payload.reviewState }
+                : item,
+            ),
+            reviewEvents: [payload.reviewEvent, ...current.reviewEvents].slice(
+              0,
+              100,
+            ),
+          }));
+        } catch {
+          // Keep the current view stable if the review request fails.
+        }
+        return;
+      }
+
       const reviewedAt = new Date();
       const reviewedIso = reviewedAt.toISOString();
 
@@ -768,13 +761,24 @@ export function AppStateProvider({
         // Leave the current plan untouched if the network request fails.
       }
     },
-    resetDemo() {
+    async resetDemo() {
       if (!remotePersistenceEnabled) {
         setState(createSeedState());
         return;
       }
 
-      window.localStorage.removeItem(reviewStorageKey);
+      try {
+        const response = await fetch("/api/review/reset", {
+          method: "POST",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+      } catch {
+        return;
+      }
+
       setState((current) => ({
         ...current,
         items: current.items.map((item) => ({

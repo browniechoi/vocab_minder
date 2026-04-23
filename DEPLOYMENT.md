@@ -30,6 +30,13 @@ Use:
 - `Hobby` only for personal testing
 - `Pro` once the app is public or commercial
 
+How preview deploys work:
+
+- every push to a non-`main` branch gets its own Vercel preview URL
+- pull requests point at that preview deployment automatically
+- this app now builds auth confirmation links against the live preview URL during preview runs, so email sign-up flows do not bounce back to production
+- preview deploys are still real apps, so if Preview env vars point at production Supabase they will mutate production data
+
 ## 3. Set Vercel Environment Variables
 
 In the Vercel project, set these environment variables.
@@ -54,25 +61,28 @@ Recommended values:
 
 - `Production`
   - `NEXT_PUBLIC_SITE_URL=https://<your-production-domain>`
-  - `NEXT_PUBLIC_SUPABASE_URL=https://yikdonnnuggljrayzqup.supabase.co`
-  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<from-supabase-dashboard>`
+  - `NEXT_PUBLIC_SUPABASE_URL=https://<your-production-project-ref>.supabase.co`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<production-publishable-key>`
 - `Preview`
-  - `NEXT_PUBLIC_SITE_URL=https://<your-production-domain>`
-  - `NEXT_PUBLIC_SUPABASE_URL=https://yikdonnnuggljrayzqup.supabase.co`
-  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<from-supabase-dashboard>`
+  - leave `NEXT_PUBLIC_SITE_URL` unset so preview auth links use the branch deployment URL automatically
+  - `NEXT_PUBLIC_SUPABASE_URL=https://<your-staging-project-ref>.supabase.co`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<staging-publishable-key>`
 - `Development`
-  - same values as preview, unless you later split staging/prod projects
+  - `NEXT_PUBLIC_SITE_URL=http://localhost:3000`
+  - `NEXT_PUBLIC_SUPABASE_URL=https://<your-staging-project-ref>.supabase.co`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<staging-publishable-key>`
 
 Notes:
 
-- `NEXT_PUBLIC_VERCEL_URL` is provided by Vercel automatically.
+- `NEXT_PUBLIC_SITE_URL` should be a stable canonical domain, not a preview branch URL.
+- Vercel exposes runtime system env vars such as `VERCEL_URL` and `VERCEL_BRANCH_URL`; the app uses those automatically for preview auth flows.
 - Do not expose `SUPABASE_SERVICE_ROLE_KEY` in Vercel unless you actually add server-only admin workflows that require it.
 
 ## 4. Configure Supabase Auth URLs
 
 In the Supabase dashboard for project `yikdonnnuggljrayzqup`, go to Auth URL configuration.
 
-Set:
+Set for production:
 
 - `Site URL`
   - `https://<your-production-domain>`
@@ -82,6 +92,8 @@ Add redirect URLs:
 - `http://localhost:3000/**`
 - `https://*-<your-vercel-team-or-account>.vercel.app/**`
 - `https://<your-production-domain>/**`
+
+If you create a separate staging Supabase project, repeat the same redirect pattern there and use the same preview wildcard URL.
 
 This app uses:
 
@@ -144,21 +156,19 @@ After the first Vercel deploy:
 6. Archive and restore a word.
 7. Open the same production URL on your phone.
 8. Sign in there and confirm the same vocab library is visible.
+9. Review a card on desktop, then refresh on phone and confirm the updated due date is reflected there too.
 
 Expected behavior right now:
 
 - vocab items sync through Supabase
 - plan changes sync through Supabase
-- review progress is still browser-local and will not yet sync between desktop and phone
-
-That last point is the main known limitation of the current slice.
+- review schedules and review history sync through Supabase
 
 ## 9. Next Engineering Slice
 
-To make phone review fully consistent with desktop, move these to Supabase next:
+To harden the deployment pipeline further, do these next:
 
-- `review_states`
-- `review_events`
-- due-card queries
-
-After that, the full core loop will be cross-device instead of only the vocab library.
+- move due-card session queries into SQL or RPC instead of hydrating the full vocab list client-side
+- enforce active-vocab limits transactionally in the database
+- split Preview and Production onto separate Supabase projects if you are not already doing that
+- add Stripe and webhook-driven plan changes once billing starts
