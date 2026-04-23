@@ -19,11 +19,24 @@ const ratingTone: Record<ReviewRating, string> = {
 
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday } = useAppState();
+  const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
-  const current = dueItems[0];
-  const nextUp = dueItems.slice(1, 4);
+  const dueItemIds = new Set(dueItems.map((item) => item.id));
+  const activeDeferredAgainIds = deferredAgainIds.filter((id) => dueItemIds.has(id));
+  const deferredAgainIdSet = new Set(activeDeferredAgainIds);
+  const deferredAgainItems = activeDeferredAgainIds.flatMap((id) => {
+    const item = dueItems.find((candidate) => candidate.id === id);
+    return item ? [item] : [];
+  });
+  const sessionQueue = [
+    ...dueItems.filter((item) => !deferredAgainIdSet.has(item.id)),
+    ...deferredAgainItems,
+  ];
+
+  const current = sessionQueue[0];
+  const nextUp = sessionQueue.slice(1, 4);
 
   if (!current) {
     return (
@@ -115,9 +128,17 @@ export function ReviewStudio() {
               type="button"
               disabled={!revealed || isSubmitting}
               onClick={async () => {
+                const currentId = current.id;
                 setIsSubmitting(true);
                 try {
-                  await answerCard(current.id, rating);
+                  await answerCard(currentId, rating);
+                  setDeferredAgainIds((currentIds) => {
+                    const remainingIds = currentIds.filter((id) => id !== currentId);
+                    if (rating === "again") {
+                      remainingIds.push(currentId);
+                    }
+                    return remainingIds;
+                  });
                   setRevealed(false);
                 } finally {
                   setIsSubmitting(false);
