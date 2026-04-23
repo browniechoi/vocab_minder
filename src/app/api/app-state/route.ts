@@ -1,22 +1,10 @@
 import { NextResponse } from "next/server";
-import { mapProfileRowToState, mapVocabRowToPersistedItem } from "@/lib/persisted-state";
+import { attachReviewState, mapProfileRowToState, mapVocabRowToPersistedItem, type VocabRow } from "@/lib/persisted-state";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
-
-type VocabRow = {
-  id: string;
-  original_query: string;
-  canonical_term: string;
-  normalized_term: string;
-  definition: string;
-  example_sentence: string | null;
-  part_of_speech: string | null;
-  pronunciations: unknown;
-  notes: string | null;
-  status: "active" | "archived";
-  search_count: number;
-  last_searched_at: string;
-  created_at: string;
-};
+import {
+  createFallbackReviewState,
+  fetchReviewHydrationForUser,
+} from "@/lib/supabase/review-data";
 
 export async function GET() {
   try {
@@ -40,8 +28,19 @@ export async function GET() {
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
+    const { reviewEvents, reviewStatesByVocabItemId } =
+      await fetchReviewHydrationForUser(supabase, user.id);
+
     return NextResponse.json({
-      items: (data ?? []).map(mapVocabRowToPersistedItem),
+      items: (data ?? []).map((row) => {
+        const persisted = mapVocabRowToPersistedItem(row);
+        return attachReviewState(
+          persisted,
+          reviewStatesByVocabItemId.get(row.id) ??
+            createFallbackReviewState(row.created_at),
+        );
+      }),
+      reviewEvents,
       profile: mapProfileRowToState(profile),
     });
   } catch (error) {

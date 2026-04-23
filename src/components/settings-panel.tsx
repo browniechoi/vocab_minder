@@ -68,7 +68,7 @@ export function SettingsPanel() {
             className="mt-6 rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
           >
             {remotePersistenceEnabled
-              ? "Reset local review data"
+              ? "Reset synced review data"
               : "Reset preview data"}
           </button>
         </div>
@@ -84,13 +84,8 @@ export function SettingsPanel() {
             <p className="mt-2 text-sm leading-7 text-[color:var(--color-muted)]">
               {remotePersistenceEnabled ? (
                 <>
-                  Signed-in mode now syncs plan state and vocab items to
-                  Supabase. Review progress still stays in browser storage under
-                  the scoped key pattern
-                  <span className="mx-1 font-mono text-[color:var(--color-foreground)]">
-                    {LOCAL_STORAGE_KEY}:&lt;auth-scope&gt;:review
-                  </span>
-                  until review history is moved into the database.
+                  Signed-in mode now syncs vocab items, plan state, review
+                  schedules, and review history to Supabase.
                 </>
               ) : (
                 <>

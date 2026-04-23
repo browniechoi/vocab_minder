@@ -19,6 +19,7 @@ const ratingTone: Record<ReviewRating, string> = {
 
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday } = useAppState();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
   const current = dueItems[0];
@@ -46,7 +47,7 @@ export function ReviewStudio() {
           </p>
           <p className="mt-3 text-4xl font-semibold">{reviewsToday}</p>
           <p className="mt-2 text-sm leading-7 text-[color:var(--color-muted)]">
-            Reviews logged today in the local review session for this browser.
+            Reviews logged today for the active account.
           </p>
         </div>
       </div>
@@ -103,18 +104,24 @@ export function ReviewStudio() {
           <button
             type="button"
             onClick={() => setRevealed(true)}
+            disabled={isSubmitting}
             className="rounded-full bg-[color:var(--color-foreground)] px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
           >
-            Reveal answer
+            {isSubmitting ? "Saving..." : "Reveal answer"}
           </button>
           {(["again", "hard", "good", "easy"] as ReviewRating[]).map((rating) => (
             <button
               key={rating}
               type="button"
-              disabled={!revealed}
-              onClick={() => {
-                answerCard(current.id, rating);
-                setRevealed(false);
+              disabled={!revealed || isSubmitting}
+              onClick={async () => {
+                setIsSubmitting(true);
+                try {
+                  await answerCard(current.id, rating);
+                  setRevealed(false);
+                } finally {
+                  setIsSubmitting(false);
+                }
               }}
               className={`rounded-full border px-5 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${ratingTone[rating]}`}
             >

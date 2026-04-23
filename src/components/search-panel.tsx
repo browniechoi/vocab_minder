@@ -56,8 +56,8 @@ export function SearchPanel() {
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[color:var(--color-muted)]">
               {remotePersistenceEnabled
-                ? "Search now goes through a server route, pulls dictionary data from Merriam-Webster, de-dups the word, enforces plan quota, and syncs the vocab list to Supabase."
-                : "Search now goes through a server route, pulls dictionary data from Merriam-Webster, de-dups the word, enforces plan quota, and keeps the vocab list local until you sign in."}
+                ? "Every successful search is saved automatically, de-duped, and synced to Supabase."
+                : "Every successful search is saved automatically. Sign in when you want the library and review history to sync across devices."}
             </p>
           </div>
 
@@ -172,7 +172,11 @@ export function SearchPanel() {
         <MetricCard
           label="Reviews Today"
           value={`${reviewsToday}`}
-          detail="Logged answers in the local review session for this browser."
+          detail={
+            remotePersistenceEnabled
+              ? "Logged answers synced to your account."
+              : "Logged answers in this local preview session."
+          }
         />
       </div>
 

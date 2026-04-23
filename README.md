@@ -1,6 +1,6 @@
-# Vocab V0
+# VocabMinder
 
-V0 is a staging-ready vocabulary web app for English learners:
+VocabMinder is a staging-ready vocabulary web app for English learners:
 
 - every successful search auto-adds the word to the vocab list
 - free users are capped at `500 active vocabs`
@@ -10,8 +10,7 @@ V0 is a staging-ready vocabulary web app for English learners:
 
 The current implementation is intentionally split in two:
 
-- signed-in users sync profile state and vocab items through `Supabase`
-- review scheduling state still lives in browser storage under `vocab-v0-local-state:<auth-scope>:review`
+- signed-in users sync profile state, vocab items, review schedules, and review history through `Supabase`
 - guest mode still falls back to a runnable local preview data layer
 
 ## Run locally
@@ -37,7 +36,7 @@ Then open [http://localhost:3000](http://localhost:3000).
 - `.env.example` documents the environment contract
 - `supabase/migrations` is now the source of truth for the initial database model
 - `src/lib/supabase/*` wires SSR auth, middleware, and clients
-- `src/app/api/app-state` and `src/app/api/vocabs/*` now back the signed-in vocab flow
+- `src/app/api/app-state`, `src/app/api/vocabs/*`, and `src/app/api/review/*` now back the signed-in product loop
 
 ## Recommended services
 
@@ -48,12 +47,12 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 ## Next implementation step
 
-Replace the remaining local review adapter with:
+Tighten the production path with:
 
-1. `review_states` and `review_events` persistence in Supabase
-2. due-card queries driven by the database instead of the browser cache
-3. transactional quota enforcement in SQL or RPC instead of per-route counting
-4. Stripe checkout and webhook plan syncing
+1. due-card queries driven directly by the database instead of hydrating the full queue into the browser
+2. transactional quota enforcement in SQL or RPC instead of per-route counting
+3. Stripe checkout and webhook plan syncing
+4. staging/production Supabase project separation for safer preview deploys
 
 ## Recommended local workflow
 

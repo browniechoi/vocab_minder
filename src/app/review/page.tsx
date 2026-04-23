@@ -13,9 +13,8 @@ export default function ReviewPage() {
           Due cards first, friction second.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[color:var(--color-muted)]">
-          The queue is driven by the same scheduling rules the cloud version
-          will use. Each answer updates interval, ease, lapse count, and due
-          date.
+          Each answer updates interval, ease, lapse count, and due date, then
+          writes the schedule back to Supabase.
         </p>
       </div>
 

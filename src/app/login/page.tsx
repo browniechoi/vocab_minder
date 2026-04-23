@@ -37,9 +37,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[color:var(--color-muted)]">
           This slice wires Supabase SSR auth and cookie-based sessions into the
-          app. Signed-in accounts now sync their vocab library and plan state to
-          Supabase, while review progress still stays local to the current
-          browser for one more slice.
+          app. Signed-in accounts now sync their vocab library, review
+          schedule, review history, and plan state through Supabase.
         </p>
       </div>
 
