@@ -4,14 +4,17 @@ import { applyReview } from "@/lib/review";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
 import {
   createFallbackReviewState,
-  fetchCardForVocabItem,
-  fetchReviewStateForCard,
+  ensureCardForVocabItem,
+  ensureReviewStateForCard,
 } from "@/lib/supabase/review-data";
 
 const VALID_RATINGS = new Set<ReviewRating>(["again", "hard", "good", "easy"]);
 
 type VocabTimingRow = {
+  canonical_term: string;
   created_at: string;
+  definition: string;
+  status: "active" | "archived";
 };
 
 export async function POST(request: Request) {
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
 
     const { data: vocabRow, error: vocabError } = await supabase
       .from("vocab_items")
-      .select("created_at")
+      .select("canonical_term, created_at, definition, status")
       .eq("user_id", user.id)
       .eq("id", body.vocabItemId)
       .single<VocabTimingRow>();
@@ -44,19 +47,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: vocabError.message }, { status: 500 });
     }
 
-    const card = await fetchCardForVocabItem(supabase, user.id, body.vocabItemId);
-    if (!card) {
-      return NextResponse.json(
-        {
-          message:
-            "Review card is not initialized for this vocab item. Apply the latest migration and reload.",
-        },
-        { status: 409 },
-      );
-    }
-
+    const card = await ensureCardForVocabItem(supabase, user.id, {
+      canonicalTerm: vocabRow.canonical_term,
+      definition: vocabRow.definition,
+      status: vocabRow.status,
+      vocabItemId: body.vocabItemId,
+    });
     const currentReviewState =
-      (await fetchReviewStateForCard(supabase, card.id)) ??
+      (await ensureReviewStateForCard(supabase, card.id, vocabRow.created_at)) ??
       createFallbackReviewState(vocabRow.created_at);
 
     const reviewedAt = new Date();

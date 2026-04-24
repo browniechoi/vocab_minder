@@ -20,6 +20,7 @@ const ratingTone: Record<ReviewRating, string> = {
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday } = useAppState();
   const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
@@ -116,7 +117,10 @@ export function ReviewStudio() {
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => setRevealed(true)}
+            onClick={() => {
+              setErrorMessage(null);
+              setRevealed(true);
+            }}
             disabled={isSubmitting}
             className="rounded-full bg-[color:var(--color-foreground)] px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
           >
@@ -129,9 +133,17 @@ export function ReviewStudio() {
               disabled={!revealed || isSubmitting}
               onClick={async () => {
                 const currentId = current.id;
+                setErrorMessage(null);
                 setIsSubmitting(true);
                 try {
-                  await answerCard(currentId, rating);
+                  const result = await answerCard(currentId, rating);
+                  if (!result.success) {
+                    setErrorMessage(
+                      result.message ??
+                        "Review answer failed before the session queue could advance.",
+                    );
+                    return;
+                  }
                   setDeferredAgainIds((currentIds) => {
                     const remainingIds = currentIds.filter((id) => id !== currentId);
                     if (rating === "again") {
@@ -150,6 +162,11 @@ export function ReviewStudio() {
             </button>
           ))}
         </div>
+        {errorMessage ? (
+          <div className="mt-4 rounded-[22px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-4 py-4 text-sm leading-7 text-[color:var(--color-foreground)]">
+            {errorMessage}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-6">

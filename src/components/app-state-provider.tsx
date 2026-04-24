@@ -65,6 +65,11 @@ type RemoteReviewAnswerResponse = {
   reviewState: ReviewState;
 };
 
+type AnswerCardResult = {
+  message?: string;
+  success: boolean;
+};
+
 type AppStateContextValue = {
   state: AppState;
   activeItems: VocabItem[];
@@ -77,7 +82,7 @@ type AppStateContextValue = {
   archiveItem: (id: string) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<{ success: boolean; message: string }>;
-  answerCard: (id: string, rating: ReviewRating) => Promise<void>;
+  answerCard: (id: string, rating: ReviewRating) => Promise<AnswerCardResult>;
   setPlanTier: (planTier: AppState["planTier"]) => Promise<void>;
   resetDemo: () => Promise<void>;
 };
@@ -681,7 +686,14 @@ export function AppStateProvider({
             !("reviewEvent" in payload) ||
             !("reviewState" in payload)
           ) {
-            return;
+            const errorMessage =
+              "message" in payload ? payload.message : undefined;
+            return {
+              success: false,
+              message:
+                errorMessage ??
+                "Review answer failed before the new schedule could be saved.",
+            };
           }
 
           setState((current) => ({
@@ -696,10 +708,13 @@ export function AppStateProvider({
               100,
             ),
           }));
+          return { success: true };
         } catch {
-          // Keep the current view stable if the review request fails.
+          return {
+            success: false,
+            message: "Review answer failed because the network request did not complete.",
+          };
         }
-        return;
       }
 
       const reviewedAt = new Date();
@@ -729,6 +744,7 @@ export function AppStateProvider({
           reviewEvents: [reviewEvent, ...current.reviewEvents].slice(0, 100),
         };
       });
+      return { success: true };
     },
     async setPlanTier(planTier) {
       if (!remotePersistenceEnabled) {
