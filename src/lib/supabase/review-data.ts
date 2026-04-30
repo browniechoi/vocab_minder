@@ -38,13 +38,14 @@ export async function fetchCardForVocabItem(
     .select("id, vocab_item_id")
     .eq("user_id", userId)
     .eq("vocab_item_id", vocabItemId)
-    .maybeSingle<CardRow>();
+    .limit(1)
+    .returns<CardRow[]>();
 
   if (error) {
     throw error;
   }
 
-  return data;
+  return data?.[0] ?? null;
 }
 
 export async function fetchReviewStateForCard(
@@ -140,4 +141,66 @@ export async function fetchReviewHydrationForUser(
 
 export function createFallbackReviewState(createdAt: string) {
   return createInitialReviewState(new Date(createdAt));
+}
+
+export async function ensureCardForVocabItem(
+  supabase: SupabaseRouteClient,
+  userId: string,
+  seed: {
+    canonicalTerm: string;
+    definition: string;
+    status: "active" | "archived";
+    vocabItemId: string;
+  },
+) {
+  const existing = await fetchCardForVocabItem(supabase, userId, seed.vocabItemId);
+  if (existing) {
+    return existing;
+  }
+
+  const { data, error } = await supabase
+    .from("cards")
+    .insert({
+      user_id: userId,
+      vocab_item_id: seed.vocabItemId,
+      front_text: seed.canonicalTerm,
+      back_text: seed.definition,
+      is_active: seed.status === "active",
+    })
+    .select("id, vocab_item_id")
+    .single<CardRow>();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function ensureReviewStateForCard(
+  supabase: SupabaseRouteClient,
+  cardId: string,
+  createdAt: string,
+) {
+  const existing = await fetchReviewStateForCard(supabase, cardId);
+  if (existing) {
+    return existing;
+  }
+
+  const initialState = createFallbackReviewState(createdAt);
+  const { error } = await supabase.from("review_states").insert({
+    card_id: cardId,
+    due_at: initialState.dueAt,
+    interval_days: initialState.intervalDays,
+    ease_factor: initialState.easeFactor,
+    repetition_count: initialState.repetitionCount,
+    lapse_count: initialState.lapseCount,
+    last_reviewed_at: initialState.lastReviewedAt,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return initialState;
 }

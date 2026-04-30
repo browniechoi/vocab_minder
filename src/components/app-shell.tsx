@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { NavLink } from "@/components/nav-link";
+import { SearchShortcut } from "@/components/search-shortcut";
 import { signOutAction } from "@/lib/auth/actions";
 
 export function AppShell({
@@ -15,6 +16,7 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-screen">
+      <SearchShortcut />
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
         <header className="soft-panel dotted-grid rounded-[32px] px-5 py-5 sm:px-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">

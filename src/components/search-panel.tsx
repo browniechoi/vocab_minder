@@ -78,6 +78,8 @@ export function SearchPanel() {
             </label>
             <input
               id="search"
+              aria-keyshortcuts="/"
+              data-primary-search-input="true"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Try meticulous, reconcile, infer, vibrant, or squander"
