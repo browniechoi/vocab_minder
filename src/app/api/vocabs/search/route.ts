@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { type DictionaryEntry } from "@/lib/app-types";
 import { lookupMerriamEntry } from "@/lib/merriam";
 import {
+  VOCAB_ROW_SELECT,
   attachReviewState,
   mapProfileRowToState,
   mapVocabRowToPersistedItem,
@@ -89,9 +90,7 @@ export async function POST(request: Request) {
 
     const { data: existingRows, error: existingError } = await supabase
       .from("vocab_items")
-      .select(
-        "id, original_query, canonical_term, normalized_term, definition, example_sentence, part_of_speech, pronunciations, notes, status, search_count, last_searched_at, created_at",
-      )
+      .select(VOCAB_ROW_SELECT)
       .eq("user_id", user.id)
       .eq("normalized_term", entry.normalizedTerm)
       .order("status", { ascending: true })
@@ -119,6 +118,7 @@ export async function POST(request: Request) {
           canonical_term: entry.canonicalTerm,
           normalized_term: entry.normalizedTerm,
           definition: entry.definition,
+          definition_labels: entry.definitionLabels ?? [],
           example_sentence: entry.exampleSentence,
           part_of_speech: entry.partOfSpeech,
           pronunciations: entry.pronunciations ?? [],
@@ -127,9 +127,7 @@ export async function POST(request: Request) {
           last_searched_at: nowIso,
         })
         .eq("id", existing.id)
-        .select(
-          "id, original_query, canonical_term, normalized_term, definition, example_sentence, part_of_speech, pronunciations, notes, status, search_count, last_searched_at, created_at",
-        )
+        .select(VOCAB_ROW_SELECT)
         .single<VocabRow>();
 
       if (updateError) {
@@ -181,6 +179,7 @@ export async function POST(request: Request) {
         canonical_term: entry.canonicalTerm,
         normalized_term: entry.normalizedTerm,
         definition: entry.definition,
+        definition_labels: entry.definitionLabels ?? [],
         example_sentence: entry.exampleSentence,
         part_of_speech: entry.partOfSpeech,
         pronunciations: entry.pronunciations ?? [],
@@ -189,9 +188,7 @@ export async function POST(request: Request) {
         search_count: 1,
         last_searched_at: nowIso,
       })
-      .select(
-        "id, original_query, canonical_term, normalized_term, definition, example_sentence, part_of_speech, pronunciations, notes, status, search_count, last_searched_at, created_at",
-      )
+      .select(VOCAB_ROW_SELECT)
       .single<VocabRow>();
 
     if (insertError) {

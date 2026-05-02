@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { attachReviewState, mapProfileRowToState, mapVocabRowToPersistedItem, type VocabRow } from "@/lib/persisted-state";
+import {
+  VOCAB_ROW_SELECT,
+  attachReviewState,
+  mapProfileRowToState,
+  mapVocabRowToPersistedItem,
+  type VocabRow,
+} from "@/lib/persisted-state";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
 import {
   createFallbackReviewState,
@@ -17,9 +23,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from("vocab_items")
-      .select(
-        "id, original_query, canonical_term, normalized_term, definition, example_sentence, part_of_speech, pronunciations, notes, status, search_count, last_searched_at, created_at",
-      )
+      .select(VOCAB_ROW_SELECT)
       .eq("user_id", user.id)
       .order("last_searched_at", { ascending: false })
       .returns<VocabRow[]>();

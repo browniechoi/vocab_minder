@@ -24,6 +24,7 @@ export type DictionaryEntry = {
   normalizedTerm: string;
   partOfSpeech: string;
   definition: string;
+  definitionLabels?: string[];
   exampleSentence: string;
   pronunciations?: Pronunciation[];
   notes?: string;
@@ -46,6 +47,7 @@ export type VocabItem = {
   normalizedTerm: string;
   partOfSpeech: string;
   definition: string;
+  definitionLabels?: string[];
   exampleSentence: string;
   pronunciations?: Pronunciation[];
   notes?: string;

@@ -12,6 +12,7 @@ import {
   type SearchOutcome,
   type VocabItem,
 } from "@/lib/app-types";
+import { normalizeDefinitionLabels } from "@/lib/definition-labels";
 import {
   attachReviewState,
   createEmptyState,
@@ -65,6 +66,12 @@ type RemoteReviewAnswerResponse = {
   reviewState: ReviewState;
 };
 
+type VocabBackUpdate = {
+  definition: string;
+  definitionLabels?: string[];
+  exampleSentence: string;
+};
+
 type AnswerCardResult = {
   message?: string;
   success: boolean;
@@ -83,6 +90,10 @@ type AppStateContextValue = {
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<{ success: boolean; message: string }>;
   answerCard: (id: string, rating: ReviewRating) => Promise<AnswerCardResult>;
+  updateVocabBack: (
+    id: string,
+    update: VocabBackUpdate,
+  ) => Promise<{ success: boolean; message?: string }>;
   setPlanTier: (planTier: AppState["planTier"]) => Promise<void>;
   resetDemo: () => Promise<void>;
 };
@@ -311,6 +322,7 @@ export function AppStateProvider({
                 normalizedTerm: entry.normalizedTerm,
                 partOfSpeech: entry.partOfSpeech,
                 definition: entry.definition,
+                definitionLabels: entry.definitionLabels,
                 exampleSentence: entry.exampleSentence,
                 pronunciations: entry.pronunciations,
                 notes: entry.notes,
@@ -423,6 +435,7 @@ export function AppStateProvider({
               ...existing,
               originalQuery: query.trim(),
               definition: entry.definition,
+              definitionLabels: entry.definitionLabels,
               exampleSentence: entry.exampleSentence,
               partOfSpeech: entry.partOfSpeech,
               pronunciations: entry.pronunciations,
@@ -745,6 +758,79 @@ export function AppStateProvider({
         };
       });
       return { success: true };
+    },
+    async updateVocabBack(id, update) {
+      const definition = update.definition.trim();
+      const exampleSentence = update.exampleSentence.trim();
+      const definitionLabels = normalizeDefinitionLabels(
+        update.definitionLabels ?? [],
+      );
+
+      if (!definition) {
+        return {
+          success: false,
+          message: "Definition is required.",
+        };
+      }
+
+      if (!remotePersistenceEnabled) {
+        setState((current) => ({
+          ...current,
+          items: current.items.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  definition,
+                  definitionLabels,
+                  exampleSentence:
+                    exampleSentence || "No example sentence available.",
+                }
+              : item,
+          ),
+        }));
+        return { success: true };
+      }
+
+      try {
+        const response = await fetch(`/api/vocabs/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            definition,
+            definitionLabels,
+            exampleSentence,
+          }),
+        });
+        const payload = (await response.json()) as
+          | { vocab?: PersistedVocabItem; message?: string }
+          | { message?: string };
+
+        if (!response.ok || !("vocab" in payload) || !payload.vocab) {
+          return {
+            success: false,
+            message:
+              payload.message ?? "Back update failed before it could be saved.",
+          };
+        }
+
+        const nextVocab = payload.vocab;
+        setState((current) => ({
+          ...current,
+          items: current.items.map((item) =>
+            item.id === id
+              ? attachReviewState(nextVocab, item.reviewState)
+              : item,
+          ),
+        }));
+        return { success: true };
+      } catch {
+        return {
+          success: false,
+          message: "Back update failed because the network request did not complete.",
+        };
+      }
     },
     async setPlanTier(planTier) {
       if (!remotePersistenceEnabled) {

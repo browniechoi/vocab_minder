@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
+import { DefinitionLabelList } from "@/components/definition-label-list";
 import { PronunciationList } from "@/components/pronunciation-list";
+import { parseDefinitionLabelText } from "@/lib/definition-labels";
 import type { ReviewRating } from "@/lib/app-types";
 import {
   RATING_LABELS,
@@ -23,9 +25,15 @@ const ratingTone: Record<ReviewRating, string> = {
 };
 
 export function ReviewStudio() {
-  const { answerCard, dueItems, reviewsToday } = useAppState();
+  const { answerCard, dueItems, reviewsToday, updateVocabBack } = useAppState();
   const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
+  const [backEditMessage, setBackEditMessage] = useState<string | null>(null);
+  const [editingBackCardId, setEditingBackCardId] = useState<string | null>(null);
+  const [editDefinition, setEditDefinition] = useState("");
+  const [editDefinitionLabels, setEditDefinitionLabels] = useState("");
+  const [editExampleSentence, setEditExampleSentence] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSavingBack, setIsSavingBack] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
@@ -43,6 +51,7 @@ export function ReviewStudio() {
 
   const current = sessionQueue[0];
   const nextUp = sessionQueue.slice(1, 4);
+  const remainingReviewCount = sessionQueue.length;
   const ratingPreviews = current
     ? (["again", "hard", "good", "easy"] as ReviewRating[]).map((rating) => ({
         intervalLabel: formatReviewInterval(
@@ -92,6 +101,9 @@ export function ReviewStudio() {
             <p className="mt-2 text-sm text-[color:var(--color-muted)]">
               Due {formatDueLabel(current.reviewState.dueAt)}
             </p>
+            <span className="mt-3 inline-flex rounded-full bg-[rgba(47,139,115,0.1)] px-3 py-1 text-xs font-medium text-[color:var(--color-accent-secondary)]">
+              {remainingReviewCount} left
+            </span>
           </div>
           <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
             interval {formatReviewInterval(current.reviewState.intervalDays)}
@@ -113,16 +125,133 @@ export function ReviewStudio() {
           {revealed ? (
             <div className="mt-8 space-y-4 border-t border-[color:var(--color-border)] pt-6">
               <div>
-                <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
-                  Back
-                </p>
-                <p className="mt-3 text-base leading-7 text-[color:var(--color-foreground)]">
-                  {current.definition}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
+                    Back
+                  </p>
+                  {editingBackCardId !== current.id ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBackEditMessage(null);
+                        setEditingBackCardId(current.id);
+                        setEditDefinition(current.definition);
+                        setEditDefinitionLabels(
+                          current.definitionLabels?.join(", ") ?? "",
+                        );
+                        setEditExampleSentence(current.exampleSentence);
+                      }}
+                      className="rounded-full border border-[color:var(--color-border)] px-3 py-1.5 text-xs font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
+                    >
+                      Edit
+                    </button>
+                  ) : null}
+                </div>
+
+                {editingBackCardId === current.id ? (
+                  <form
+                    className="mt-4 space-y-4"
+                    onSubmit={async (event) => {
+                      event.preventDefault();
+                      setBackEditMessage(null);
+                      setIsSavingBack(true);
+                      try {
+                        const result = await updateVocabBack(current.id, {
+                          definition: editDefinition,
+                          definitionLabels:
+                            parseDefinitionLabelText(editDefinitionLabels),
+                          exampleSentence: editExampleSentence,
+                        });
+
+                        if (!result.success) {
+                          setBackEditMessage(
+                            result.message ?? "Back update failed.",
+                          );
+                          return;
+                        }
+
+                        setEditingBackCardId(null);
+                      } finally {
+                        setIsSavingBack(false);
+                      }
+                    }}
+                  >
+                    <label className="block">
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Labels
+                      </span>
+                      <input
+                        value={editDefinitionLabels}
+                        onChange={(event) =>
+                          setEditDefinitionLabels(event.target.value)
+                        }
+                        placeholder="formal, literary"
+                        className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Definition
+                      </span>
+                      <textarea
+                        required
+                        value={editDefinition}
+                        onChange={(event) => setEditDefinition(event.target.value)}
+                        className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Example
+                      </span>
+                      <textarea
+                        value={editExampleSentence}
+                        onChange={(event) =>
+                          setEditExampleSentence(event.target.value)
+                        }
+                        className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm italic leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                      />
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="submit"
+                        disabled={isSavingBack}
+                        className="rounded-full bg-[color:var(--color-foreground)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSavingBack ? "Saving..." : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSavingBack}
+                        onClick={() => {
+                          setBackEditMessage(null);
+                          setEditingBackCardId(null);
+                        }}
+                        className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <DefinitionLabelList labels={current.definitionLabels} />
+                    <p className="mt-3 text-base leading-7 text-[color:var(--color-foreground)]">
+                      {current.definition}
+                    </p>
+                  </>
+                )}
+                {backEditMessage ? (
+                  <p className="mt-3 rounded-[18px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-4 py-3 text-sm text-[color:var(--color-foreground)]">
+                    {backEditMessage}
+                  </p>
+                ) : null}
               </div>
-              <p className="rounded-[22px] bg-[rgba(47,139,115,0.08)] px-4 py-4 text-sm italic leading-7 text-[color:var(--color-foreground)]">
-                “{current.exampleSentence}”
-              </p>
+              {editingBackCardId !== current.id ? (
+                <p className="rounded-[22px] bg-[rgba(47,139,115,0.08)] px-4 py-4 text-sm italic leading-7 text-[color:var(--color-foreground)]">
+                  “{current.exampleSentence}”
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -134,7 +263,7 @@ export function ReviewStudio() {
               setErrorMessage(null);
               setRevealed(true);
             }}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isSavingBack}
             className="rounded-full bg-[color:var(--color-foreground)] px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
           >
             {isSubmitting ? "Saving..." : "Reveal answer"}
@@ -143,7 +272,12 @@ export function ReviewStudio() {
             <button
               key={rating}
               type="button"
-              disabled={!revealed || isSubmitting}
+              disabled={
+                !revealed ||
+                isSubmitting ||
+                isSavingBack ||
+                editingBackCardId === current.id
+              }
               onClick={async () => {
                 const currentId = current.id;
                 setErrorMessage(null);
@@ -164,6 +298,8 @@ export function ReviewStudio() {
                     }
                     return remainingIds;
                   });
+                  setBackEditMessage(null);
+                  setEditingBackCardId(null);
                   setRevealed(false);
                 } finally {
                   setIsSubmitting(false);

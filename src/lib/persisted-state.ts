@@ -10,6 +10,10 @@ import type {
   ReviewState,
   VocabItem,
 } from "@/lib/app-types";
+import {
+  normalizeDefinitionLabels,
+  splitInlineDefinitionLabels,
+} from "@/lib/definition-labels";
 import { PLAN_LIMITS } from "@/lib/plan";
 import { createInitialReviewState } from "@/lib/review";
 
@@ -24,6 +28,7 @@ export type VocabRow = {
   canonical_term: string;
   normalized_term: string;
   definition: string;
+  definition_labels?: unknown;
   example_sentence: string | null;
   part_of_speech: string | null;
   pronunciations: unknown;
@@ -33,6 +38,9 @@ export type VocabRow = {
   last_searched_at: string;
   created_at: string;
 };
+
+export const VOCAB_ROW_SELECT =
+  "id, original_query, canonical_term, normalized_term, definition, definition_labels, example_sentence, part_of_speech, pronunciations, notes, status, search_count, last_searched_at, created_at";
 
 export type CardRow = {
   id: string;
@@ -108,13 +116,20 @@ export function mapProfileRowToState(profile: ProfileRow | null): ProfileState {
 }
 
 export function mapVocabRowToPersistedItem(row: VocabRow): PersistedVocabItem {
+  const storedLabels = normalizeDefinitionLabels(row.definition_labels);
+  const fallbackDefinitionParts = splitInlineDefinitionLabels(row.definition);
+  const definitionLabels =
+    storedLabels.length > 0 ? storedLabels : fallbackDefinitionParts.definitionLabels;
+
   return {
     id: row.id,
     originalQuery: row.original_query,
     canonicalTerm: row.canonical_term,
     normalizedTerm: row.normalized_term,
     partOfSpeech: row.part_of_speech ?? "unknown",
-    definition: row.definition,
+    definition:
+      storedLabels.length > 0 ? row.definition : fallbackDefinitionParts.definition,
+    definitionLabels,
     exampleSentence:
       row.example_sentence ?? "No example sentence available in this entry.",
     pronunciations: normalizePronunciations(row.pronunciations),

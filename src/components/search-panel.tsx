@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
+import { DefinitionLabelList } from "@/components/definition-label-list";
 import { PronunciationList } from "@/components/pronunciation-list";
 import type { SearchOutcome } from "@/lib/app-types";
 import { formatDueLabel, formatReviewInterval } from "@/lib/review";
@@ -139,6 +140,9 @@ export function SearchPanel() {
                   <p className="mt-3 text-sm leading-7">
                     {lastResult.entry.definition}
                   </p>
+                  <DefinitionLabelList
+                    labels={lastResult.entry.definitionLabels}
+                  />
                   <p className="mt-3 text-sm italic text-[color:var(--color-muted)]">
                     “{lastResult.entry.exampleSentence}”
                   </p>
@@ -209,6 +213,7 @@ export function SearchPanel() {
                     <p className="text-sm text-[color:var(--color-muted)]">
                       {item.definition}
                     </p>
+                    <DefinitionLabelList labels={item.definitionLabels} />
                   </div>
                   <span className="rounded-full bg-[rgba(221,107,63,0.12)] px-3 py-1 text-xs font-medium text-[color:var(--color-accent)]">
                     {formatDueLabel(item.reviewState.dueAt)}

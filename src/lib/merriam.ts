@@ -1,4 +1,8 @@
 import type { DictionaryEntry, Pronunciation } from "@/lib/app-types";
+import {
+  parseDefinitionLabelText,
+  splitInlineDefinitionLabels,
+} from "@/lib/definition-labels";
 
 type MerriamVis = {
   t?: string;
@@ -8,6 +12,7 @@ type MerriamDtItem = [string, unknown];
 
 type MerriamSense = {
   dt?: MerriamDtItem[];
+  sls?: string[];
 };
 
 type MerriamSenseGroup = [string, MerriamSense];
@@ -108,6 +113,50 @@ function extractExample(entry: MerriamEntry) {
   return "";
 }
 
+function extractDefinition(entry: MerriamEntry) {
+  for (const definition of entry.def ?? []) {
+    for (const senseList of definition.sseq ?? []) {
+      for (const [, sense] of senseList) {
+        const textItem = sense.dt?.find(
+          (item): item is ["text", string] =>
+            item[0] === "text" && typeof item[1] === "string",
+        );
+        const cleanDefinition = textItem ? cleanMerriamText(textItem[1]) : "";
+
+        if (!cleanDefinition) {
+          continue;
+        }
+
+        return {
+          definition: cleanDefinition,
+          definitionLabels: (sense.sls ?? []).flatMap(parseDefinitionLabelText),
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractFallbackDefinition(value: string | undefined) {
+  if (!value) {
+    return {
+      definition: "",
+      definitionLabels: [] as string[],
+    };
+  }
+
+  const italicLabelMatch = /^\{it\}([^{}]+)\{\/it\}\s*(.+)$/.exec(value);
+  if (italicLabelMatch) {
+    return {
+      definition: cleanMerriamText(italicLabelMatch[2]),
+      definitionLabels: parseDefinitionLabelText(italicLabelMatch[1]),
+    };
+  }
+
+  return splitInlineDefinitionLabels(cleanMerriamText(value));
+}
+
 function extractPronunciations(entry: MerriamEntry): Pronunciation[] {
   const seen = new Set<string>();
   const pronunciations: Pronunciation[] = [];
@@ -165,9 +214,10 @@ export function toDictionaryEntry(payload: unknown): DictionaryEntry | null {
       firstEntry.meta?.id?.split(":")[0] ??
       "",
   );
-  const definition = cleanMerriamText(
-    appShortDef?.def?.[0] ?? firstEntry.shortdef?.[0] ?? "",
-  );
+  const extractedDefinition =
+    extractDefinition(firstEntry) ??
+    extractFallbackDefinition(appShortDef?.def?.[0] ?? firstEntry.shortdef?.[0]);
+  const definition = extractedDefinition.definition;
 
   if (!canonicalTerm || !definition) {
     return null;
@@ -178,6 +228,7 @@ export function toDictionaryEntry(payload: unknown): DictionaryEntry | null {
     normalizedTerm: canonicalTerm.toLowerCase(),
     partOfSpeech: appShortDef?.fl ?? firstEntry.fl ?? "unknown",
     definition,
+    definitionLabels: extractedDefinition.definitionLabels,
     exampleSentence:
       extractExample(firstEntry) || "No example sentence available in this entry.",
     pronunciations: extractPronunciations(firstEntry),

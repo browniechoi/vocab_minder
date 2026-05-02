@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
+import { DefinitionLabelList } from "@/components/definition-label-list";
 import { PronunciationList } from "@/components/pronunciation-list";
 import { formatDueLabel, formatReviewInterval } from "@/lib/review";
 
@@ -108,6 +109,7 @@ export function VocabLibrary() {
                 <p className="mt-4 text-sm leading-7 text-[color:var(--color-foreground)]">
                   {item.definition}
                 </p>
+                <DefinitionLabelList labels={item.definitionLabels} />
                 <PronunciationList
                   pronunciations={item.pronunciations}
                   compact
