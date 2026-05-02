@@ -3,6 +3,7 @@ const CANONICAL_LABELS = [
   "disapproving",
   "sometimes offensive",
   "often offensive",
+  "somewhat formal",
   "informal",
   "literary",
   "technical",
@@ -17,8 +18,9 @@ const LABEL_BY_LOWERCASE = new Map(
   CANONICAL_LABELS.map((label) => [label.toLowerCase(), label]),
 );
 
+const LABEL_PATTERN = CANONICAL_LABELS.map(escapeRegex).join("|");
 const INLINE_LABEL_PATTERN = new RegExp(
-  `^(${CANONICAL_LABELS.map(escapeRegex).join("|")})(?:\\s*\\+\\s*(${CANONICAL_LABELS.map(escapeRegex).join("|")}))*\\s+(.+)$`,
+  `^((?:(?:${LABEL_PATTERN})(?:\\s*\\+\\s*)?)+)\\s+(.+)$`,
   "i",
 );
 
@@ -72,7 +74,7 @@ export function splitInlineDefinitionLabels(definition: string) {
 
   const matchedPrefix = trimmedDefinition.slice(
     0,
-    trimmedDefinition.length - match[match.length - 1].length,
+    trimmedDefinition.length - match[2].length,
   );
   const labels = parseDefinitionLabelText(matchedPrefix);
 
@@ -84,7 +86,7 @@ export function splitInlineDefinitionLabels(definition: string) {
   }
 
   return {
-    definition: match[match.length - 1].trim(),
+    definition: match[2].trim(),
     definitionLabels: labels,
   };
 }
