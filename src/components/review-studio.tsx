@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
 import { PronunciationList } from "@/components/pronunciation-list";
 import type { ReviewRating } from "@/lib/app-types";
-import { RATING_LABELS, formatDueLabel, formatReviewInterval } from "@/lib/review";
+import {
+  RATING_LABELS,
+  applyReview,
+  formatDueLabel,
+  formatReviewInterval,
+} from "@/lib/review";
 
 const ratingTone: Record<ReviewRating, string> = {
   again:
@@ -38,6 +43,14 @@ export function ReviewStudio() {
 
   const current = sessionQueue[0];
   const nextUp = sessionQueue.slice(1, 4);
+  const ratingPreviews = current
+    ? (["again", "hard", "good", "easy"] as ReviewRating[]).map((rating) => ({
+        intervalLabel: formatReviewInterval(
+          applyReview(current.reviewState, rating).intervalDays,
+        ),
+        rating,
+      }))
+    : [];
 
   if (!current) {
     return (
@@ -126,7 +139,7 @@ export function ReviewStudio() {
           >
             {isSubmitting ? "Saving..." : "Reveal answer"}
           </button>
-          {(["again", "hard", "good", "easy"] as ReviewRating[]).map((rating) => (
+          {ratingPreviews.map(({ intervalLabel, rating }) => (
             <button
               key={rating}
               type="button"
@@ -156,9 +169,10 @@ export function ReviewStudio() {
                   setIsSubmitting(false);
                 }
               }}
-              className={`rounded-full border px-5 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${ratingTone[rating]}`}
+              className={`flex min-w-24 flex-col items-center rounded-full border px-5 py-2.5 text-sm font-medium leading-tight transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${ratingTone[rating]}`}
             >
-              {RATING_LABELS[rating]}
+              <span>{RATING_LABELS[rating]}</span>
+              <span className="mt-1 text-xs opacity-75">{intervalLabel}</span>
             </button>
           ))}
         </div>

@@ -1,6 +1,7 @@
 import type { ReviewRating, ReviewState } from "@/lib/app-types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const AGAIN_INTERVAL_MINUTES = 10;
 
 export const RATING_LABELS: Record<ReviewRating, string> = {
   again: "Again",
@@ -32,7 +33,7 @@ export function applyReview(
   const easeFloor = 1.3;
 
   if (rating === "again") {
-    const intervalDays = 30 / (24 * 60);
+    const intervalDays = AGAIN_INTERVAL_MINUTES / (24 * 60);
     return {
       dueAt: new Date(now.getTime() + intervalDays * DAY_MS).toISOString(),
       intervalDays,
@@ -121,8 +122,13 @@ export function formatReviewInterval(intervalDays: number) {
     return "new";
   }
 
+  const minutes = Math.round(intervalDays * 24 * 60);
+  if (minutes < 60) {
+    return `${Math.max(1, minutes)}m`;
+  }
+
   if (intervalDays < 1) {
-    return `${Math.max(1, Math.round(intervalDays * 24))}h`;
+    return `${Math.round(intervalDays * 24)}h`;
   }
 
   if (intervalDays < 14) {
