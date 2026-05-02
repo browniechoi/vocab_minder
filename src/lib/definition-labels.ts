@@ -6,6 +6,7 @@ const CANONICAL_LABELS = [
   "somewhat formal",
   "informal",
   "literary",
+  "medical",
   "technical",
   "formal",
   "slang",
