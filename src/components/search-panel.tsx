@@ -5,7 +5,7 @@ import { useAppState } from "@/components/app-state-provider";
 import { DefinitionLabelList } from "@/components/definition-label-list";
 import { PronunciationList } from "@/components/pronunciation-list";
 import type { SearchOutcome } from "@/lib/app-types";
-import { formatDueLabel, formatReviewInterval } from "@/lib/review";
+import { formatDueLabel } from "@/lib/review";
 
 const outcomeStyles: Record<SearchOutcome, string> = {
   saved:
@@ -231,8 +231,9 @@ export function SearchPanel() {
 
         <div className="soft-panel rounded-[32px] px-6 py-6">
           <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
-            Recent Vocabulary
+            Next Reviews
           </p>
+          <h2 className="mt-3 text-xl font-semibold">Active queue</h2>
           <div className="mt-5 space-y-3">
             {activeItems.slice(0, 5).map((item) => (
               <div
@@ -249,7 +250,7 @@ export function SearchPanel() {
                     </p>
                   </div>
                   <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
-                    {formatReviewInterval(item.reviewState.intervalDays)}
+                    {formatDueLabel(item.reviewState.dueAt)}
                   </span>
                 </div>
               </div>
