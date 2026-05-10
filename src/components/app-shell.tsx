@@ -34,10 +34,6 @@ export function AppShell({
                   </p>
                 </div>
               </Link>
-              <p className="max-w-2xl text-sm leading-6 text-[color:var(--color-muted)]">
-                Built as a low-maintenance English-learning tool: opinionated
-                capture flow, clean plan limits, and a direct path to Supabase.
-              </p>
             </div>
 
             <div className="flex flex-col items-start gap-3 lg:items-end">

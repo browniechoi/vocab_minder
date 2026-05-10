@@ -67,9 +67,11 @@ type RemoteReviewAnswerResponse = {
 };
 
 type VocabBackUpdate = {
+  canonicalTerm?: string;
   definition: string;
   definitionLabels?: string[];
   exampleSentence: string;
+  partOfSpeech?: string;
 };
 
 type AnswerCardResult = {
@@ -760,11 +762,28 @@ export function AppStateProvider({
       return { success: true };
     },
     async updateVocabBack(id, update) {
+      const canonicalTerm = update.canonicalTerm?.trim();
       const definition = update.definition.trim();
       const exampleSentence = update.exampleSentence.trim();
       const definitionLabels = normalizeDefinitionLabels(
         update.definitionLabels ?? [],
       );
+      const normalizedTerm = canonicalTerm ? normalizeQuery(canonicalTerm) : "";
+      const partOfSpeech = update.partOfSpeech?.trim();
+
+      if (update.canonicalTerm !== undefined && !canonicalTerm) {
+        return {
+          success: false,
+          message: "Word is required.",
+        };
+      }
+
+      if (canonicalTerm && !normalizedTerm) {
+        return {
+          success: false,
+          message: "Word needs at least one letter or number.",
+        };
+      }
 
       if (!definition) {
         return {
@@ -780,10 +799,20 @@ export function AppStateProvider({
             item.id === id
               ? {
                   ...item,
+                  canonicalTerm: canonicalTerm ?? item.canonicalTerm,
+                  normalizedTerm: normalizedTerm || item.normalizedTerm,
                   definition,
                   definitionLabels,
                   exampleSentence:
                     exampleSentence || "No example sentence available.",
+                  partOfSpeech:
+                    update.partOfSpeech !== undefined
+                      ? partOfSpeech || "unknown"
+                      : item.partOfSpeech,
+                  pronunciations:
+                    canonicalTerm && normalizedTerm !== item.normalizedTerm
+                      ? []
+                      : item.pronunciations,
                 }
               : item,
           ),
@@ -798,9 +827,11 @@ export function AppStateProvider({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            canonicalTerm,
             definition,
             definitionLabels,
             exampleSentence,
+            partOfSpeech,
           }),
         });
         const payload = (await response.json()) as

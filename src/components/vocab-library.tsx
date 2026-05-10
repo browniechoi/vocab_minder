@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
 import { DefinitionLabelList } from "@/components/definition-label-list";
 import { PronunciationList } from "@/components/pronunciation-list";
+import type { VocabItem } from "@/lib/app-types";
+import { parseDefinitionLabelText } from "@/lib/definition-labels";
 import { formatDueLabel, formatReviewInterval } from "@/lib/review";
 
 type FilterMode = "all" | "active" | "archived";
@@ -16,10 +18,29 @@ export function VocabLibrary() {
     deleteItem,
     remotePersistenceEnabled,
     restoreItem,
+    updateVocabBack,
   } = useAppState();
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editDefinition, setEditDefinition] = useState("");
+  const [editDefinitionLabels, setEditDefinitionLabels] = useState("");
+  const [editExampleSentence, setEditExampleSentence] = useState("");
+  const [editMessage, setEditMessage] = useState<string | null>(null);
+  const [editPartOfSpeech, setEditPartOfSpeech] = useState("");
+  const [editTerm, setEditTerm] = useState("");
   const [filter, setFilter] = useState<FilterMode>("all");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [query, setQuery] = useState("");
   const [restoreMessage, setRestoreMessage] = useState("");
+
+  function startEditing(item: VocabItem) {
+    setEditMessage(null);
+    setEditingItemId(item.id);
+    setEditDefinition(item.definition);
+    setEditDefinitionLabels(item.definitionLabels?.join(", ") ?? "");
+    setEditExampleSentence(item.exampleSentence);
+    setEditPartOfSpeech(item.partOfSpeech);
+    setEditTerm(item.canonicalTerm);
+  }
 
   const items = [...activeItems, ...archivedItems]
     .filter((item) => {
@@ -88,109 +109,250 @@ export function VocabLibrary() {
       </div>
 
       <div className="space-y-4">
-        {items.map((item) => (
-          <article
-            key={item.id}
-            className="soft-panel rounded-[30px] px-6 py-6"
-          >
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-3xl">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-2xl font-semibold text-[color:var(--color-foreground)]">
-                    {item.canonicalTerm}
-                  </h2>
-                  <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
-                    {item.status}
-                  </span>
-                  <span className="rounded-full bg-[rgba(221,107,63,0.12)] px-3 py-1 text-xs font-medium text-[color:var(--color-accent)]">
-                    {item.partOfSpeech}
-                  </span>
-                </div>
-                <p className="mt-4 text-sm leading-7 text-[color:var(--color-foreground)]">
-                  {item.definition}
-                </p>
-                <DefinitionLabelList labels={item.definitionLabels} />
-                <PronunciationList
-                  pronunciations={item.pronunciations}
-                  compact
-                />
-                <p className="mt-3 text-sm italic leading-7 text-[color:var(--color-muted)]">
-                  “{item.exampleSentence}”
-                </p>
-                <div className="mt-5 flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
-                  <span>{item.searchCount} searches</span>
-                  <span>{formatDueLabel(item.reviewState.dueAt)}</span>
-                  <span>{formatReviewInterval(item.reviewState.intervalDays)}</span>
-                </div>
-              </div>
+        {items.map((item) => {
+          const isEditing = editingItemId === item.id;
 
-              <div className="flex gap-3">
-                {item.status === "active" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => archiveItem(item.id)}
-                      className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-warning)] hover:text-[color:var(--color-warning)]"
-                    >
-                      Archive
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const shouldDelete = window.confirm(
-                          `Delete "${item.canonicalTerm}" permanently from your vocab library?`,
-                        );
-                        if (shouldDelete) {
-                          void deleteItem(item.id);
-                          setRestoreMessage(
-                            remotePersistenceEnabled
-                              ? `"${item.canonicalTerm}" was deleted from Supabase and removed from this review browser state.`
-                              : `"${item.canonicalTerm}" was deleted from local preview data.`,
-                          );
+          return (
+            <article
+              key={item.id}
+              className="soft-panel rounded-[30px] px-6 py-6"
+            >
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-3xl flex-1">
+                  {isEditing ? (
+                    <form
+                      className="space-y-4"
+                      onSubmit={async (event) => {
+                        event.preventDefault();
+                        setEditMessage(null);
+                        setIsSavingEdit(true);
+                        try {
+                          const result = await updateVocabBack(item.id, {
+                            canonicalTerm:
+                              editTerm.trim() === item.canonicalTerm
+                                ? undefined
+                                : editTerm,
+                            definition: editDefinition,
+                            definitionLabels:
+                              parseDefinitionLabelText(editDefinitionLabels),
+                            exampleSentence: editExampleSentence,
+                            partOfSpeech: editPartOfSpeech,
+                          });
+
+                          if (!result.success) {
+                            setEditMessage(
+                              result.message ?? "Vocabulary update failed.",
+                            );
+                            return;
+                          }
+
+                          setEditingItemId(null);
+                        } finally {
+                          setIsSavingEdit(false);
                         }
                       }}
-                      className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-danger)] hover:text-[color:var(--color-danger)]"
                     >
-                      Delete
-                    </button>
-                  </>
-                ) : (
-                  <>
+                      <div className="grid gap-4 md:grid-cols-[1fr_0.45fr]">
+                        <label className="block">
+                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                            Word
+                          </span>
+                          <input
+                            required
+                            value={editTerm}
+                            onChange={(event) => setEditTerm(event.target.value)}
+                            className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                            Part of speech
+                          </span>
+                          <input
+                            value={editPartOfSpeech}
+                            onChange={(event) =>
+                              setEditPartOfSpeech(event.target.value)
+                            }
+                            className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                          />
+                        </label>
+                      </div>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Labels
+                        </span>
+                        <input
+                          value={editDefinitionLabels}
+                          onChange={(event) =>
+                            setEditDefinitionLabels(event.target.value)
+                          }
+                          placeholder="formal, literary"
+                          className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Definition
+                        </span>
+                        <textarea
+                          required
+                          value={editDefinition}
+                          onChange={(event) =>
+                            setEditDefinition(event.target.value)
+                          }
+                          className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Example
+                        </span>
+                        <textarea
+                          value={editExampleSentence}
+                          onChange={(event) =>
+                            setEditExampleSentence(event.target.value)
+                          }
+                          className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm italic leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
+                      {editMessage ? (
+                        <p className="rounded-[18px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-4 py-3 text-sm text-[color:var(--color-foreground)]">
+                          {editMessage}
+                        </p>
+                      ) : null}
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="submit"
+                          disabled={isSavingEdit}
+                          className="rounded-full bg-[color:var(--color-foreground)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isSavingEdit ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingEdit}
+                          onClick={() => {
+                            setEditMessage(null);
+                            setEditingItemId(null);
+                          }}
+                          className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h2 className="text-2xl font-semibold text-[color:var(--color-foreground)]">
+                          {item.canonicalTerm}
+                        </h2>
+                        <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
+                          {item.status}
+                        </span>
+                        <span className="rounded-full bg-[rgba(221,107,63,0.12)] px-3 py-1 text-xs font-medium text-[color:var(--color-accent)]">
+                          {item.partOfSpeech}
+                        </span>
+                      </div>
+                      <p className="mt-4 text-sm leading-7 text-[color:var(--color-foreground)]">
+                        {item.definition}
+                      </p>
+                      <DefinitionLabelList labels={item.definitionLabels} />
+                      <PronunciationList
+                        pronunciations={item.pronunciations}
+                        compact
+                      />
+                      <p className="mt-3 text-sm italic leading-7 text-[color:var(--color-muted)]">
+                        “{item.exampleSentence}”
+                      </p>
+                      <div className="mt-5 flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        <span>{item.searchCount} searches</span>
+                        <span>{formatDueLabel(item.reviewState.dueAt)}</span>
+                        <span>
+                          {formatReviewInterval(item.reviewState.intervalDays)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  {!isEditing ? (
                     <button
                       type="button"
-                      onClick={async () => {
-                        const response = await restoreItem(item.id);
-                        setRestoreMessage(response.message);
-                      }}
-                      className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent-secondary)] hover:text-[color:var(--color-accent-secondary)]"
+                      onClick={() => startEditing(item)}
+                      className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
                     >
-                      Restore
+                      Edit
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const shouldDelete = window.confirm(
-                          `Delete "${item.canonicalTerm}" permanently from your vocab library?`,
-                        );
-                        if (shouldDelete) {
-                          void deleteItem(item.id);
-                          setRestoreMessage(
-                            remotePersistenceEnabled
-                              ? `"${item.canonicalTerm}" was deleted from Supabase and removed from this review browser state.`
-                              : `"${item.canonicalTerm}" was deleted from local preview data.`,
+                  ) : null}
+                  {item.status === "active" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => archiveItem(item.id)}
+                        className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-warning)] hover:text-[color:var(--color-warning)]"
+                      >
+                        Archive
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const shouldDelete = window.confirm(
+                            `Delete "${item.canonicalTerm}" permanently from your vocab library?`,
                           );
-                        }
-                      }}
-                      className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-danger)] hover:text-[color:var(--color-danger)]"
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
+                          if (shouldDelete) {
+                            void deleteItem(item.id);
+                            setRestoreMessage(
+                              remotePersistenceEnabled
+                                ? `"${item.canonicalTerm}" was deleted from Supabase and removed from this review browser state.`
+                                : `"${item.canonicalTerm}" was deleted from local preview data.`,
+                            );
+                          }
+                        }}
+                        className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-danger)] hover:text-[color:var(--color-danger)]"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const response = await restoreItem(item.id);
+                          setRestoreMessage(response.message);
+                        }}
+                        className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent-secondary)] hover:text-[color:var(--color-accent-secondary)]"
+                      >
+                        Restore
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const shouldDelete = window.confirm(
+                            `Delete "${item.canonicalTerm}" permanently from your vocab library?`,
+                          );
+                          if (shouldDelete) {
+                            void deleteItem(item.id);
+                            setRestoreMessage(
+                              remotePersistenceEnabled
+                                ? `"${item.canonicalTerm}" was deleted from Supabase and removed from this review browser state.`
+                                : `"${item.canonicalTerm}" was deleted from local preview data.`,
+                            );
+                          }
+                        }}
+                        className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-danger)] hover:text-[color:var(--color-danger)]"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
 
         {items.length === 0 ? (
           <div className="soft-panel rounded-[30px] px-6 py-8 text-sm leading-7 text-[color:var(--color-muted)]">
