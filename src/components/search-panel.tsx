@@ -195,7 +195,7 @@ export function SearchPanel() {
               </p>
               <h2 className="mt-3 text-xl font-semibold">Due cards</h2>
             </div>
-            <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
               {dueItems.length} open
             </span>
           </div>
@@ -206,7 +206,7 @@ export function SearchPanel() {
                 className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold text-[color:var(--color-foreground)]">
                       {item.canonicalTerm}
                     </p>
@@ -215,7 +215,7 @@ export function SearchPanel() {
                     </p>
                     <DefinitionLabelList labels={item.definitionLabels} />
                   </div>
-                  <span className="rounded-full bg-[rgba(221,107,63,0.12)] px-3 py-1 text-xs font-medium text-[color:var(--color-accent)]">
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-[rgba(221,107,63,0.12)] px-3 py-1 text-xs font-medium text-[color:var(--color-accent)]">
                     {formatDueLabel(item.reviewState.dueAt)}
                   </span>
                 </div>
