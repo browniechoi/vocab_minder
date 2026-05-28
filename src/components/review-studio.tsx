@@ -27,12 +27,22 @@ const ratingTone: Record<ReviewRating, string> = {
 
 function getCardTypeLabel(cardType: string) {
   if (cardType === "production") {
-    return "Meaning -> word";
+    return "Reverse recall";
   }
   if (cardType === "listening") {
-    return "Audio -> word";
+    return "Listening recall";
   }
-  return "Word -> meaning";
+  return "Recognition";
+}
+
+function getCardTypeDescription(cardType: string) {
+  if (cardType === "production") {
+    return "Type the word from a clue.";
+  }
+  if (cardType === "listening") {
+    return "Hear audio, then type the word.";
+  }
+  return "Recall the meaning from the word.";
 }
 
 function getClozeSentence(term: string, exampleSentence: string, clozeSentence?: string) {
@@ -77,8 +87,29 @@ export function ReviewStudio() {
   ];
 
   const current = sessionQueue[0];
-  const nextUp = sessionQueue.slice(1, 4);
   const remainingReviewCount = sessionQueue.length;
+  const upcomingItems = sessionQueue.slice(1);
+  const upcomingReviewCount = upcomingItems.length;
+  const upcomingTypeSummaries = [
+    {
+      cardType: "production",
+      count: upcomingItems.filter(
+        (item) => item.reviewCard.cardType === "production",
+      ).length,
+    },
+    {
+      cardType: "recognition",
+      count: upcomingItems.filter(
+        (item) => item.reviewCard.cardType === "recognition",
+      ).length,
+    },
+    {
+      cardType: "listening",
+      count: upcomingItems.filter(
+        (item) => item.reviewCard.cardType === "listening",
+      ).length,
+    },
+  ].filter((summary) => summary.count > 0);
   const currentCardId = current?.reviewCard.id;
   const revealed = Boolean(currentCardId && revealedCardId === currentCardId);
   const typedAnswer = currentCardId ? typedAnswers[currentCardId] ?? "" : "";
@@ -456,21 +487,38 @@ export function ReviewStudio() {
       <div className="grid gap-6">
         <div className="soft-panel rounded-[32px] px-6 py-6">
           <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
-            Next Up
+            Queue
           </p>
-          <div className="mt-5 space-y-3">
-            {nextUp.length > 0 ? (
-              nextUp.map((item) => (
+          <div className="mt-5 rounded-[24px] border border-[color:var(--color-border)] bg-white px-5 py-5">
+            <p className="text-3xl font-semibold text-[color:var(--color-foreground)]">
+              {upcomingReviewCount}
+            </p>
+            <p className="mt-2 text-sm leading-7 text-[color:var(--color-muted)]">
+              {upcomingReviewCount === 1
+                ? "card after this one. Answers stay hidden to avoid preview hints."
+                : "cards after this one. Answers stay hidden to avoid preview hints."}
+            </p>
+          </div>
+          <div className="mt-3 space-y-3">
+            {upcomingTypeSummaries.length > 0 ? (
+              upcomingTypeSummaries.map(({ cardType, count }) => (
                 <div
-                  key={item.reviewCard.id}
+                  key={cardType}
                   className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4"
                 >
-                  <p className="font-semibold text-[color:var(--color-foreground)]">
-                    {getCardTypeLabel(item.reviewCard.cardType)}
-                  </p>
-                  <p className="mt-1 text-sm text-[color:var(--color-muted)]">
-                    {formatDueLabel(item.reviewCard.reviewState.dueAt)}
-                  </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-[color:var(--color-foreground)]">
+                        {getCardTypeLabel(cardType)}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-[color:var(--color-muted)]">
+                        {getCardTypeDescription(cardType)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
+                      {count}
+                    </span>
+                  </div>
                 </div>
               ))
             ) : (
