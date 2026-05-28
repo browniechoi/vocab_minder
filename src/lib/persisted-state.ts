@@ -4,8 +4,11 @@ import type {
   PlanTier,
   ProfileState,
   Pronunciation,
+  ReviewCard,
+  ReviewCardType,
   ReviewEvent,
   ReviewCache,
+  ReviewMemoryState,
   ReviewRating,
   ReviewState,
   VocabItem,
@@ -30,6 +33,7 @@ export type VocabRow = {
   definition: string;
   definition_labels?: unknown;
   example_sentence: string | null;
+  cloze_sentence?: string | null;
   part_of_speech: string | null;
   pronunciations: unknown;
   notes: string | null;
@@ -40,26 +44,34 @@ export type VocabRow = {
 };
 
 export const VOCAB_ROW_SELECT =
-  "id, original_query, canonical_term, normalized_term, definition, definition_labels, example_sentence, part_of_speech, pronunciations, notes, status, search_count, last_searched_at, created_at";
+  "id, original_query, canonical_term, normalized_term, definition, definition_labels, example_sentence, cloze_sentence, part_of_speech, pronunciations, notes, status, search_count, last_searched_at, created_at";
 
 export type CardRow = {
   id: string;
+  card_type: ReviewCardType;
+  is_active: boolean;
   vocab_item_id: string;
 };
 
 export type ReviewStateRow = {
   card_id: string;
+  desired_retention?: number | string | null;
+  difficulty?: number | string | null;
   due_at: string;
+  fsrs_state?: ReviewMemoryState | null;
   interval_days: number | string;
   ease_factor: number | string;
+  learning_steps?: number | null;
   repetition_count: number;
   lapse_count: number;
   last_reviewed_at: string | null;
+  stability_days?: number | string | null;
 };
 
 export type ReviewEventRow = {
   id: string;
   card_id: string;
+  card_type?: ReviewCardType;
   rating: ReviewRating;
   reviewed_at: string;
   previous_due_at: string;
@@ -104,6 +116,7 @@ export function createEmptyState(): AppState {
     planTier: "free",
     activeLimit: PLAN_LIMITS.free,
     items: [],
+    reviewCards: [],
     reviewEvents: [],
   };
 }
@@ -132,6 +145,7 @@ export function mapVocabRowToPersistedItem(row: VocabRow): PersistedVocabItem {
     definitionLabels,
     exampleSentence:
       row.example_sentence ?? "No example sentence available in this entry.",
+    clozeSentence: row.cloze_sentence ?? undefined,
     pronunciations: normalizePronunciations(row.pronunciations),
     notes: row.notes ?? undefined,
     status: row.status,
@@ -156,7 +170,13 @@ export function mergePersistedItemsWithReviewCache(
   reviewCache: ReviewCache,
 ): VocabItem[] {
   return items.map((item) =>
-    attachReviewState(item, reviewCache.reviewStates[item.id]),
+    attachReviewState(
+      item,
+      reviewCache.reviewCards.find(
+        (card) =>
+          card.vocabItemId === item.id && card.cardType === "recognition",
+      )?.reviewState,
+    ),
   );
 }
 
@@ -168,15 +188,36 @@ export function mapReviewStateRow(row: ReviewStateRow): ReviewState {
     repetitionCount: row.repetition_count,
     lapseCount: row.lapse_count,
     lastReviewedAt: row.last_reviewed_at,
+    stabilityDays: Number(row.stability_days ?? 0),
+    difficulty: Number(row.difficulty ?? row.ease_factor ?? 0),
+    fsrsState: row.fsrs_state ?? "New",
+    learningSteps: row.learning_steps ?? 0,
+    desiredRetention: Number(row.desired_retention ?? 0.92),
+  };
+}
+
+export function mapReviewCardRow(
+  row: CardRow,
+  reviewState: ReviewState,
+): ReviewCard {
+  return {
+    id: row.id,
+    vocabItemId: row.vocab_item_id,
+    cardType: row.card_type,
+    isActive: row.is_active,
+    reviewState,
   };
 }
 
 export function mapReviewEventRow(
   row: ReviewEventRow,
   vocabItemId: string,
+  cardType?: ReviewCardType,
 ): ReviewEvent {
   return {
     id: row.id,
+    cardId: row.card_id,
+    cardType: row.card_type ?? cardType,
     vocabItemId,
     rating: row.rating,
     reviewedAt: row.reviewed_at,
@@ -187,9 +228,7 @@ export function mapReviewEventRow(
 
 export function buildReviewCache(state: AppState): ReviewCache {
   return {
-    reviewStates: Object.fromEntries(
-      state.items.map((item) => [item.id, item.reviewState]),
-    ),
+    reviewCards: state.reviewCards,
     reviewEvents: state.reviewEvents,
   };
 }

@@ -8,9 +8,10 @@ import { parseDefinitionLabelText } from "@/lib/definition-labels";
 import type { ReviewRating } from "@/lib/app-types";
 import {
   RATING_LABELS,
-  applyReview,
   formatDueLabel,
   formatReviewInterval,
+  getReviewRetrievability,
+  previewReview,
 } from "@/lib/review";
 
 const ratingTone: Record<ReviewRating, string> = {
@@ -24,45 +25,85 @@ const ratingTone: Record<ReviewRating, string> = {
     "border-[color:var(--color-foreground)] text-[color:var(--color-foreground)] hover:bg-[rgba(17,32,57,0.08)]",
 };
 
+function getCardTypeLabel(cardType: string) {
+  if (cardType === "production") {
+    return "Meaning -> word";
+  }
+  if (cardType === "listening") {
+    return "Audio -> word";
+  }
+  return "Word -> meaning";
+}
+
+function getClozeSentence(term: string, exampleSentence: string, clozeSentence?: string) {
+  if (clozeSentence) {
+    return clozeSentence;
+  }
+
+  const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const termPattern = new RegExp(`\\b${escapedTerm}(?:ed|ing|s)?\\b`, "i");
+  if (termPattern.test(exampleSentence)) {
+    return exampleSentence.replace(termPattern, "_____");
+  }
+
+  return exampleSentence;
+}
+
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday, updateVocabBack } = useAppState();
   const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
   const [backEditMessage, setBackEditMessage] = useState<string | null>(null);
   const [editingBackCardId, setEditingBackCardId] = useState<string | null>(null);
+  const [editClozeSentence, setEditClozeSentence] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
   const [editDefinitionLabels, setEditDefinitionLabels] = useState("");
   const [editExampleSentence, setEditExampleSentence] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSavingBack, setIsSavingBack] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+  const [revealedCardId, setRevealedCardId] = useState<string | null>(null);
+  const [typedAnswers, setTypedAnswers] = useState<Record<string, string>>({});
 
-  const dueItemIds = new Set(dueItems.map((item) => item.id));
+  const dueItemIds = new Set(dueItems.map((item) => item.reviewCard.id));
   const activeDeferredAgainIds = deferredAgainIds.filter((id) => dueItemIds.has(id));
   const deferredAgainIdSet = new Set(activeDeferredAgainIds);
   const deferredAgainItems = activeDeferredAgainIds.flatMap((id) => {
-    const item = dueItems.find((candidate) => candidate.id === id);
+    const item = dueItems.find((candidate) => candidate.reviewCard.id === id);
     return item ? [item] : [];
   });
   const sessionQueue = [
-    ...dueItems.filter((item) => !deferredAgainIdSet.has(item.id)),
+    ...dueItems.filter((item) => !deferredAgainIdSet.has(item.reviewCard.id)),
     ...deferredAgainItems,
   ];
 
   const current = sessionQueue[0];
   const nextUp = sessionQueue.slice(1, 4);
   const remainingReviewCount = sessionQueue.length;
+  const currentCardId = current?.reviewCard.id;
+  const revealed = Boolean(currentCardId && revealedCardId === currentCardId);
+  const typedAnswer = currentCardId ? typedAnswers[currentCardId] ?? "" : "";
   const ratingPreviews = current
     ? (["again", "hard", "good", "easy"] as ReviewRating[]).map((rating) => ({
         nextDueLabel: formatDueLabel(
-          applyReview(current.reviewState, rating).dueAt,
+          previewReview(current.reviewState, rating).dueAt,
         ),
         nextIntervalLabel: formatReviewInterval(
-          applyReview(current.reviewState, rating).intervalDays,
+          previewReview(current.reviewState, rating).intervalDays,
         ),
         rating,
       }))
     : [];
+  const isProductionCard = current?.reviewCard.cardType === "production";
+  const clozeSentence = current
+    ? getClozeSentence(
+        current.canonicalTerm,
+        current.exampleSentence,
+        current.clozeSentence,
+      )
+    : "";
+  const retrievability = current
+    ? getReviewRetrievability(current.reviewState)
+    : null;
 
   if (!current) {
     return (
@@ -99,7 +140,7 @@ export function ReviewStudio() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
-              Current Card
+              {current ? getCardTypeLabel(current.reviewCard.cardType) : "Current Card"}
             </p>
             <p className="mt-2 text-sm text-[color:var(--color-muted)]">
               Due {formatDueLabel(current.reviewState.dueAt)}
@@ -117,13 +158,50 @@ export function ReviewStudio() {
           <p className="text-xs font-medium uppercase tracking-[0.3em] text-[color:var(--color-accent)]">
             Front
           </p>
-          <h2 className="mt-4 text-4xl font-semibold text-[color:var(--color-foreground)]">
-            {current.canonicalTerm}
-          </h2>
-          <p className="mt-2 text-sm text-[color:var(--color-muted)]">
-            {current.partOfSpeech}
-          </p>
-          <PronunciationList pronunciations={current.pronunciations} />
+          {isProductionCard ? (
+            <div className="mt-4 space-y-5">
+              <DefinitionLabelList labels={current.definitionLabels} />
+              <p className="text-lg leading-8 text-[color:var(--color-foreground)]">
+                {current.definition}
+              </p>
+              <p className="rounded-[22px] bg-[rgba(47,139,115,0.08)] px-4 py-4 text-sm italic leading-7 text-[color:var(--color-foreground)]">
+                &quot;{clozeSentence}&quot;
+              </p>
+              <label className="block">
+                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                  Type the word
+                </span>
+                <input
+                  value={typedAnswer}
+                  onChange={(event) => {
+                    const nextAnswer = event.target.value;
+                    if (!currentCardId) {
+                      return;
+                    }
+                    setTypedAnswers((currentAnswers) => ({
+                      ...currentAnswers,
+                      [currentCardId]: nextAnswer,
+                    }));
+                  }}
+                  disabled={revealed || isSubmitting || isSavingBack}
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  className="mt-2 h-12 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-base text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)] disabled:opacity-70"
+                />
+              </label>
+            </div>
+          ) : (
+            <>
+              <h2 className="mt-4 text-4xl font-semibold text-[color:var(--color-foreground)]">
+                {current.canonicalTerm}
+              </h2>
+              <p className="mt-2 text-sm text-[color:var(--color-muted)]">
+                {current.partOfSpeech}
+              </p>
+              <PronunciationList pronunciations={current.pronunciations} />
+            </>
+          )}
 
           {revealed ? (
             <div className="mt-8 space-y-4 border-t border-[color:var(--color-border)] pt-6">
@@ -138,6 +216,7 @@ export function ReviewStudio() {
                       onClick={() => {
                         setBackEditMessage(null);
                         setEditingBackCardId(current.id);
+                        setEditClozeSentence(current.clozeSentence ?? "");
                         setEditDefinition(current.definition);
                         setEditDefinitionLabels(
                           current.definitionLabels?.join(", ") ?? "",
@@ -160,6 +239,7 @@ export function ReviewStudio() {
                       setIsSavingBack(true);
                       try {
                         const result = await updateVocabBack(current.id, {
+                          clozeSentence: editClozeSentence,
                           definition: editDefinition,
                           definitionLabels:
                             parseDefinitionLabelText(editDefinitionLabels),
@@ -215,6 +295,19 @@ export function ReviewStudio() {
                         className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm italic leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
                       />
                     </label>
+                    <label className="block">
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Cloze
+                      </span>
+                      <textarea
+                        value={editClozeSentence}
+                        onChange={(event) =>
+                          setEditClozeSentence(event.target.value)
+                        }
+                        placeholder="Use _____ for the hidden word."
+                        className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm italic leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                      />
+                    </label>
                     <div className="flex flex-wrap gap-3">
                       <button
                         type="submit"
@@ -237,12 +330,32 @@ export function ReviewStudio() {
                     </div>
                   </form>
                 ) : (
-                  <>
-                    <DefinitionLabelList labels={current.definitionLabels} />
-                    <p className="mt-3 text-base leading-7 text-[color:var(--color-foreground)]">
-                      {current.definition}
-                    </p>
-                  </>
+                  isProductionCard ? (
+                    <div className="space-y-3">
+                      {typedAnswer.trim() ? (
+                        <p className="rounded-[18px] bg-[rgba(17,32,57,0.06)] px-4 py-3 text-sm text-[color:var(--color-muted)]">
+                          Your answer:{" "}
+                          <span className="font-medium text-[color:var(--color-foreground)]">
+                            {typedAnswer}
+                          </span>
+                        </p>
+                      ) : null}
+                      <h2 className="text-4xl font-semibold text-[color:var(--color-foreground)]">
+                        {current.canonicalTerm}
+                      </h2>
+                      <p className="text-sm text-[color:var(--color-muted)]">
+                        {current.partOfSpeech}
+                      </p>
+                      <PronunciationList pronunciations={current.pronunciations} />
+                    </div>
+                  ) : (
+                    <>
+                      <DefinitionLabelList labels={current.definitionLabels} />
+                      <p className="mt-3 text-base leading-7 text-[color:var(--color-foreground)]">
+                        {current.definition}
+                      </p>
+                    </>
+                  )
                 )}
                 {backEditMessage ? (
                   <p className="mt-3 rounded-[18px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-4 py-3 text-sm text-[color:var(--color-foreground)]">
@@ -262,14 +375,29 @@ export function ReviewStudio() {
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
+            aria-pressed={revealed}
             onClick={() => {
               setErrorMessage(null);
-              setRevealed(true);
+              if (revealed) {
+                setBackEditMessage(null);
+                setEditingBackCardId(null);
+              }
+              setRevealedCardId((currentRevealedCardId) =>
+                currentRevealedCardId === currentCardId
+                  ? null
+                  : currentCardId ?? null,
+              );
             }}
             disabled={isSubmitting || isSavingBack}
             className="rounded-full bg-[color:var(--color-foreground)] px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
           >
-            {isSubmitting ? "Saving..." : "Reveal answer"}
+            {isSubmitting
+              ? "Saving..."
+              : revealed
+                ? "Unreveal answer"
+                : isProductionCard
+                  ? "Check answer"
+                  : "Reveal answer"}
           </button>
           {ratingPreviews.map(({ nextDueLabel, nextIntervalLabel, rating }) => (
             <button
@@ -282,7 +410,7 @@ export function ReviewStudio() {
                 editingBackCardId === current.id
               }
               onClick={async () => {
-                const currentId = current.id;
+                const currentId = current.reviewCard.id;
                 setErrorMessage(null);
                 setIsSubmitting(true);
                 try {
@@ -303,7 +431,7 @@ export function ReviewStudio() {
                   });
                   setBackEditMessage(null);
                   setEditingBackCardId(null);
-                  setRevealed(false);
+                  setRevealedCardId(null);
                 } finally {
                   setIsSubmitting(false);
                 }
@@ -334,16 +462,15 @@ export function ReviewStudio() {
             {nextUp.length > 0 ? (
               nextUp.map((item) => (
                 <div
-                  key={item.id}
+                  key={item.reviewCard.id}
                   className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4"
                 >
                   <p className="font-semibold text-[color:var(--color-foreground)]">
-                    {item.canonicalTerm}
+                    {getCardTypeLabel(item.reviewCard.cardType)}
                   </p>
                   <p className="mt-1 text-sm text-[color:var(--color-muted)]">
-                    {item.partOfSpeech}
+                    {formatDueLabel(item.reviewCard.reviewState.dueAt)}
                   </p>
-                  <PronunciationList pronunciations={item.pronunciations} compact />
                 </div>
               ))
             ) : (
@@ -366,9 +493,17 @@ export function ReviewStudio() {
               </dd>
             </div>
             <div className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4">
-              <dt className="text-[color:var(--color-muted)]">Ease factor</dt>
+              <dt className="text-[color:var(--color-muted)]">Difficulty</dt>
               <dd className="mt-1 text-xl font-semibold text-[color:var(--color-foreground)]">
-                {current.reviewState.easeFactor.toFixed(2)}
+                {current.reviewState.difficulty.toFixed(2)}
+              </dd>
+            </div>
+            <div className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4">
+              <dt className="text-[color:var(--color-muted)]">Retrievability</dt>
+              <dd className="mt-1 text-xl font-semibold text-[color:var(--color-foreground)]">
+                {retrievability === null
+                  ? "new"
+                  : `${Math.round(retrievability * 100)}%`}
               </dd>
             </div>
             <div className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4">

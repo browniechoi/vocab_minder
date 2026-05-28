@@ -20,7 +20,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "VocabMinder",
   description:
-    "A cloud-ready English vocabulary app with automatic saving, usage caps, and Anki-style review.",
+    "A cloud-ready English vocabulary app with automatic capture, usage caps, and FSRS review.",
 };
 
 export default async function RootLayout({

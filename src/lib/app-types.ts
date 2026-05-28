@@ -4,11 +4,16 @@ export type VocabStatus = "active" | "archived";
 
 export type ReviewRating = "again" | "hard" | "good" | "easy";
 
+export type ReviewCardType = "recognition" | "production" | "listening";
+
+export type ReviewMemoryState = "New" | "Learning" | "Review" | "Relearning";
+
 export type SearchOutcome =
   | "saved"
   | "existing_active"
   | "existing_archived"
   | "limit_reached"
+  | "review_load_high"
   | "not_found"
   | "empty_query";
 
@@ -26,6 +31,7 @@ export type DictionaryEntry = {
   definition: string;
   definitionLabels?: string[];
   exampleSentence: string;
+  clozeSentence?: string;
   pronunciations?: Pronunciation[];
   notes?: string;
   lookupKeys: string[];
@@ -38,6 +44,11 @@ export type ReviewState = {
   repetitionCount: number;
   lapseCount: number;
   lastReviewedAt: string | null;
+  stabilityDays: number;
+  difficulty: number;
+  fsrsState: ReviewMemoryState;
+  learningSteps: number;
+  desiredRetention: number;
 };
 
 export type VocabItem = {
@@ -49,6 +60,7 @@ export type VocabItem = {
   definition: string;
   definitionLabels?: string[];
   exampleSentence: string;
+  clozeSentence?: string;
   pronunciations?: Pronunciation[];
   notes?: string;
   status: VocabStatus;
@@ -58,8 +70,22 @@ export type VocabItem = {
   reviewState: ReviewState;
 };
 
+export type ReviewCard = {
+  id: string;
+  vocabItemId: string;
+  cardType: ReviewCardType;
+  isActive: boolean;
+  reviewState: ReviewState;
+};
+
+export type ReviewQueueItem = VocabItem & {
+  reviewCard: ReviewCard;
+};
+
 export type ReviewEvent = {
   id: string;
+  cardId?: string;
+  cardType?: ReviewCardType;
   vocabItemId: string;
   rating: ReviewRating;
   reviewedAt: string;
@@ -75,7 +101,7 @@ export type ProfileState = {
 };
 
 export type ReviewCache = {
-  reviewStates: Record<string, ReviewState>;
+  reviewCards: ReviewCard[];
   reviewEvents: ReviewEvent[];
 };
 
@@ -83,5 +109,6 @@ export type AppState = {
   planTier: PlanTier;
   activeLimit: number;
   items: VocabItem[];
+  reviewCards: ReviewCard[];
   reviewEvents: ReviewEvent[];
 };

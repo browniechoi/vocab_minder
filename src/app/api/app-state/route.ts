@@ -32,7 +32,7 @@ export async function GET() {
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    const { reviewEvents, reviewStatesByVocabItemId } =
+    const { reviewCards, reviewEvents, reviewStatesByVocabItemId } =
       await fetchReviewHydrationForUser(supabase, user.id);
 
     return NextResponse.json({
@@ -44,6 +44,7 @@ export async function GET() {
             createFallbackReviewState(row.created_at),
         );
       }),
+      reviewCards,
       reviewEvents,
       profile: mapProfileRowToState(profile),
     });

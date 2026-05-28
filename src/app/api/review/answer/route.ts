@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { ReviewRating } from "@/lib/app-types";
-import { applyReview } from "@/lib/review";
+import { applyReview, shouldUnlockProduction } from "@/lib/review";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
 import {
   createFallbackReviewState,
@@ -17,6 +17,13 @@ type VocabTimingRow = {
   status: "active" | "archived";
 };
 
+type ReviewCardRow = {
+  id: string;
+  card_type: "recognition" | "production" | "listening";
+  is_active: boolean;
+  vocab_item_id: string;
+};
+
 export async function POST(request: Request) {
   try {
     const { errorResponse, supabase, user } = await getAuthenticatedContext();
@@ -25,22 +32,34 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as {
+      cardId?: string;
       rating?: ReviewRating;
       vocabItemId?: string;
     };
 
-    if (!body.vocabItemId || !body.rating || !VALID_RATINGS.has(body.rating)) {
+    if (!body.cardId || !body.rating || !VALID_RATINGS.has(body.rating)) {
       return NextResponse.json(
-        { message: "A vocab item id and valid rating are required." },
+        { message: "A review card id and valid rating are required." },
         { status: 400 },
       );
+    }
+
+    const { data: cardRow, error: cardError } = await supabase
+      .from("cards")
+      .select("id, vocab_item_id, card_type, is_active")
+      .eq("user_id", user.id)
+      .eq("id", body.cardId)
+      .single<ReviewCardRow>();
+
+    if (cardError) {
+      return NextResponse.json({ message: cardError.message }, { status: 500 });
     }
 
     const { data: vocabRow, error: vocabError } = await supabase
       .from("vocab_items")
       .select("canonical_term, created_at, definition, status")
       .eq("user_id", user.id)
-      .eq("id", body.vocabItemId)
+      .eq("id", cardRow.vocab_item_id)
       .single<VocabTimingRow>();
 
     if (vocabError) {
@@ -51,27 +70,80 @@ export async function POST(request: Request) {
       canonicalTerm: vocabRow.canonical_term,
       definition: vocabRow.definition,
       status: vocabRow.status,
-      vocabItemId: body.vocabItemId,
-    });
+      vocabItemId: cardRow.vocab_item_id,
+    }, cardRow.card_type);
+    const activeCard = {
+      ...card,
+      card_type: cardRow.card_type,
+      is_active: cardRow.is_active,
+    };
     const currentReviewState =
-      (await ensureReviewStateForCard(supabase, card.id, vocabRow.created_at)) ??
-      createFallbackReviewState(vocabRow.created_at);
+      (await ensureReviewStateForCard(
+        supabase,
+        activeCard.id,
+        vocabRow.created_at,
+      )) ?? createFallbackReviewState(vocabRow.created_at);
 
     const reviewedAt = new Date();
     const reviewedIso = reviewedAt.toISOString();
     const nextReviewState = applyReview(currentReviewState, body.rating, reviewedAt);
+    let unlockedCard:
+      | {
+          id: string;
+          vocabItemId: string;
+          cardType: "recognition" | "production" | "listening";
+          isActive: boolean;
+          reviewState: typeof nextReviewState;
+        }
+      | undefined;
+
+    if (
+      activeCard.card_type === "recognition" &&
+      shouldUnlockProduction(nextReviewState)
+    ) {
+      const productionCard = await ensureCardForVocabItem(
+        supabase,
+        user.id,
+        {
+          canonicalTerm: vocabRow.canonical_term,
+          definition: vocabRow.definition,
+          status: vocabRow.status,
+          vocabItemId: cardRow.vocab_item_id,
+        },
+        "production",
+      );
+      const productionReviewState =
+        (await ensureReviewStateForCard(
+          supabase,
+          productionCard.id,
+          reviewedIso,
+        )) ?? createFallbackReviewState(reviewedIso);
+
+      unlockedCard = {
+        id: productionCard.id,
+        vocabItemId: productionCard.vocab_item_id,
+        cardType: productionCard.card_type,
+        isActive: productionCard.is_active,
+        reviewState: productionReviewState,
+      };
+    }
 
     const { error: reviewStateError } = await supabase
       .from("review_states")
       .upsert(
         {
-          card_id: card.id,
+          card_id: activeCard.id,
           due_at: nextReviewState.dueAt,
           interval_days: nextReviewState.intervalDays,
           ease_factor: nextReviewState.easeFactor,
           repetition_count: nextReviewState.repetitionCount,
           lapse_count: nextReviewState.lapseCount,
           last_reviewed_at: nextReviewState.lastReviewedAt,
+          stability_days: nextReviewState.stabilityDays,
+          difficulty: nextReviewState.difficulty,
+          fsrs_state: nextReviewState.fsrsState,
+          learning_steps: nextReviewState.learningSteps,
+          desired_retention: nextReviewState.desiredRetention,
         },
         { onConflict: "card_id" },
       );
@@ -87,7 +159,7 @@ export async function POST(request: Request) {
       .from("review_events")
       .insert({
         user_id: user.id,
-        card_id: card.id,
+        card_id: activeCard.id,
         rating: body.rating,
         reviewed_at: reviewedIso,
         previous_due_at: currentReviewState.dueAt,
@@ -104,10 +176,19 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      reviewState: nextReviewState,
+      reviewCard: {
+        id: activeCard.id,
+        vocabItemId: activeCard.vocab_item_id,
+        cardType: activeCard.card_type,
+        isActive: activeCard.is_active,
+        reviewState: nextReviewState,
+      },
+      unlockedCard,
       reviewEvent: {
         id: reviewEventRow.id,
-        vocabItemId: body.vocabItemId,
+        cardId: activeCard.id,
+        cardType: activeCard.card_type,
+        vocabItemId: activeCard.vocab_item_id,
         rating: body.rating,
         reviewedAt: reviewedIso,
         previousDueAt: currentReviewState.dueAt,

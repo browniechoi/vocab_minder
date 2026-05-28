@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createInitialReviewState } from "@/lib/review";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
 import { fetchCardsForUser } from "@/lib/supabase/review-data";
 
@@ -37,15 +38,21 @@ export async function POST() {
         continue;
       }
 
+      const initialState = createInitialReviewState(new Date(createdAt));
       const { error } = await supabase.from("review_states").upsert(
         {
           card_id: card.id,
-          due_at: createdAt,
-          interval_days: 0,
-          ease_factor: 2.5,
-          repetition_count: 0,
-          lapse_count: 0,
-          last_reviewed_at: null,
+          due_at: initialState.dueAt,
+          interval_days: initialState.intervalDays,
+          ease_factor: initialState.easeFactor,
+          repetition_count: initialState.repetitionCount,
+          lapse_count: initialState.lapseCount,
+          last_reviewed_at: initialState.lastReviewedAt,
+          stability_days: initialState.stabilityDays,
+          difficulty: initialState.difficulty,
+          fsrs_state: initialState.fsrsState,
+          learning_steps: initialState.learningSteps,
+          desired_retention: initialState.desiredRetention,
         },
         { onConflict: "card_id" },
       );

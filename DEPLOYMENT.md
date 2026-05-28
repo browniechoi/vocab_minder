@@ -5,6 +5,7 @@ This app should be deployed as:
 - frontend/app server: `Vercel`
 - auth + database: `Supabase`
 - dictionary lookup: `Merriam-Webster Learner's Dictionary API`
+- optional learner-context enrichment: `OpenAI Responses API`
 
 For your current hosted backend, the Supabase project ref is:
 
@@ -46,6 +47,11 @@ Required for all environments:
 - `MERRIAM_API_KEY`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+Optional for richer definitions, examples, and cloze prompts:
+
+- `OPENAI_API_KEY`
+- `OPENAI_VOCAB_MODEL` defaults to `gpt-4.1-mini` when unset
 
 Required for production:
 
@@ -136,6 +142,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=https://yikdonnnuggljrayzqup.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<from-supabase-dashboard>
 MERRIAM_API_KEY=<your-merriam-key>
+OPENAI_API_KEY=<optional-openai-key>
 ```
 
 Then run:

@@ -1,7 +1,50 @@
-import type { ReviewRating, ReviewState } from "@/lib/app-types";
+import {
+  createEmptyCard,
+  fsrs,
+  Rating as FsrsRating,
+  State as FsrsState,
+  type Card as FsrsCard,
+  type Grade,
+} from "ts-fsrs";
+import type {
+  ReviewMemoryState,
+  ReviewRating,
+  ReviewState,
+} from "@/lib/app-types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const AGAIN_INTERVAL_MINUTES = 10;
+export const DESIRED_RETENTION = 0.92;
+export const NEW_WORD_DUE_CARD_LIMIT = 40;
+
+const scheduler = fsrs({
+  request_retention: DESIRED_RETENTION,
+  maximum_interval: 36500,
+  enable_fuzz: false,
+  enable_short_term: true,
+  learning_steps: ["10m"],
+  relearning_steps: ["10m"],
+});
+
+const ratingToFsrs: Record<ReviewRating, Grade> = {
+  again: FsrsRating.Again,
+  hard: FsrsRating.Hard,
+  good: FsrsRating.Good,
+  easy: FsrsRating.Easy,
+};
+
+const memoryStateToFsrs: Record<ReviewMemoryState, FsrsState> = {
+  New: FsrsState.New,
+  Learning: FsrsState.Learning,
+  Review: FsrsState.Review,
+  Relearning: FsrsState.Relearning,
+};
+
+const fsrsStateToMemory: Record<FsrsState, ReviewMemoryState> = {
+  [FsrsState.New]: "New",
+  [FsrsState.Learning]: "Learning",
+  [FsrsState.Review]: "Review",
+  [FsrsState.Relearning]: "Relearning",
+};
 
 export const RATING_LABELS: Record<ReviewRating, string> = {
   again: "Again",
@@ -18,6 +61,11 @@ export function createInitialReviewState(now = new Date()): ReviewState {
     repetitionCount: 0,
     lapseCount: 0,
     lastReviewedAt: null,
+    stabilityDays: 0,
+    difficulty: 0,
+    fsrsState: "New",
+    learningSteps: 0,
+    desiredRetention: DESIRED_RETENTION,
   };
 }
 
@@ -30,69 +78,96 @@ export function applyReview(
   rating: ReviewRating,
   now = new Date(),
 ): ReviewState {
-  const easeFloor = 1.3;
+  return fromFsrsCard(scheduler.next(toFsrsCard(reviewState), now, ratingToFsrs[rating]).card, now);
+}
 
-  if (rating === "again") {
-    const intervalDays = AGAIN_INTERVAL_MINUTES / (24 * 60);
-    return {
-      dueAt: new Date(now.getTime() + intervalDays * DAY_MS).toISOString(),
-      intervalDays,
-      easeFactor: Math.max(easeFloor, reviewState.easeFactor - 0.2),
-      repetitionCount: 0,
-      lapseCount: reviewState.lapseCount + 1,
-      lastReviewedAt: now.toISOString(),
-    };
+export function previewReview(
+  reviewState: ReviewState,
+  rating: ReviewRating,
+  now = new Date(),
+) {
+  return fromFsrsCard(
+    scheduler.repeat(toFsrsCard(reviewState), now)[ratingToFsrs[rating]].card,
+    now,
+  );
+}
+
+export function getReviewRetrievability(
+  reviewState: ReviewState,
+  now = new Date(),
+) {
+  if (getMemoryState(reviewState) === "New") {
+    return null;
   }
 
-  if (rating === "hard") {
-    const intervalDays =
-      reviewState.repetitionCount === 0
-        ? 1
-        : Math.max(1, Number((reviewState.intervalDays * 1.2).toFixed(2)));
-    return {
-      dueAt: new Date(now.getTime() + intervalDays * DAY_MS).toISOString(),
-      intervalDays,
-      easeFactor: Math.max(easeFloor, reviewState.easeFactor - 0.05),
-      repetitionCount: reviewState.repetitionCount + 1,
-      lapseCount: reviewState.lapseCount,
-      lastReviewedAt: now.toISOString(),
-    };
-  }
+  return scheduler.get_retrievability(toFsrsCard(reviewState), now, false);
+}
 
-  if (rating === "good") {
-    const intervalDays =
-      reviewState.repetitionCount === 0
-        ? 1
-        : Math.max(
-            2,
-            Number((reviewState.intervalDays * reviewState.easeFactor).toFixed(2)),
-          );
-    return {
-      dueAt: new Date(now.getTime() + intervalDays * DAY_MS).toISOString(),
-      intervalDays,
-      easeFactor: reviewState.easeFactor,
-      repetitionCount: reviewState.repetitionCount + 1,
-      lapseCount: reviewState.lapseCount,
-      lastReviewedAt: now.toISOString(),
-    };
-  }
+export function shouldUnlockProduction(reviewState: ReviewState) {
+  return reviewState.repetitionCount >= 2 || reviewState.intervalDays >= 1;
+}
 
-  const intervalDays =
-    reviewState.repetitionCount === 0
-      ? 3
-      : Math.max(
-          4,
-          Number(
-            (reviewState.intervalDays * reviewState.easeFactor * 1.35).toFixed(2),
-          ),
-        );
+function toFsrsCard(reviewState: ReviewState): FsrsCard {
+  const emptyCard = createEmptyCard(new Date(reviewState.dueAt));
+  const intervalDays = Number.isFinite(reviewState.intervalDays)
+    ? reviewState.intervalDays
+    : 0;
+  const stabilityDays = Number.isFinite(reviewState.stabilityDays)
+    ? reviewState.stabilityDays
+    : Math.max(intervalDays, 0);
+  const difficulty = Number.isFinite(reviewState.difficulty)
+    ? reviewState.difficulty
+    : Number.isFinite(reviewState.easeFactor)
+      ? reviewState.easeFactor
+      : 0;
+
   return {
-    dueAt: new Date(now.getTime() + intervalDays * DAY_MS).toISOString(),
+    ...emptyCard,
+    due: new Date(reviewState.dueAt),
+    stability: stabilityDays,
+    difficulty,
+    elapsed_days: Math.max(0, Math.round(intervalDays)),
+    scheduled_days: Math.max(0, Math.round(intervalDays)),
+    learning_steps: reviewState.learningSteps ?? 0,
+    reps: reviewState.repetitionCount ?? 0,
+    lapses: reviewState.lapseCount ?? 0,
+    state: memoryStateToFsrs[getMemoryState(reviewState)],
+    last_review: reviewState.lastReviewedAt
+      ? new Date(reviewState.lastReviewedAt)
+      : undefined,
+  };
+}
+
+function getMemoryState(reviewState: ReviewState): ReviewMemoryState {
+  if (
+    reviewState.fsrsState === "New" ||
+    reviewState.fsrsState === "Learning" ||
+    reviewState.fsrsState === "Review" ||
+    reviewState.fsrsState === "Relearning"
+  ) {
+    return reviewState.fsrsState;
+  }
+
+  return reviewState.repetitionCount > 0 ? "Review" : "New";
+}
+
+function fromFsrsCard(card: FsrsCard, now = new Date()): ReviewState {
+  const intervalFromDue = Math.max(0, (card.due.getTime() - now.getTime()) / DAY_MS);
+  const intervalDays =
+    card.scheduled_days > 0 ? card.scheduled_days : Number(intervalFromDue.toFixed(4));
+
+  return {
+    dueAt: card.due.toISOString(),
     intervalDays,
-    easeFactor: reviewState.easeFactor + 0.15,
-    repetitionCount: reviewState.repetitionCount + 1,
-    lapseCount: reviewState.lapseCount,
-    lastReviewedAt: now.toISOString(),
+    easeFactor: card.difficulty,
+    repetitionCount: card.reps,
+    lapseCount: card.lapses,
+    lastReviewedAt: card.last_review?.toISOString() ?? null,
+    stabilityDays: card.stability,
+    difficulty: card.difficulty,
+    fsrsState: fsrsStateToMemory[card.state],
+    learningSteps: card.learning_steps,
+    desiredRetention: DESIRED_RETENTION,
   };
 }
 

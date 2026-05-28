@@ -23,6 +23,9 @@ importers:
       react-dom:
         specifier: 19.2.4
         version: 19.2.4(react@19.2.4)
+      ts-fsrs:
+        specifier: ^5.3.3
+        version: 5.3.3
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4
@@ -1949,6 +1952,10 @@ packages:
     engines: {node: '>=18.12'}
     peerDependencies:
       typescript: '>=4.8.4'
+
+  ts-fsrs@5.3.3:
+    resolution: {integrity: sha512-DgWFirmZe9MTqJiwtlLZoa/xyzibfKtQvuXZoH5X0kei64Cp4o1SlT6EbajjDT8dr/a4x82fLkKrCbePq4bxag==}
+    engines: {node: '>=20.0.0'}
 
   tsconfig-paths@3.15.0:
     resolution: {integrity: sha512-2Ac2RgzDe/cn48GvOe3M+o82pEFewD3UPbyoUHHdKasHwJKjds4fLXWf/Ux5kATBKN20oaFGu+jbElp1pos0mg==}
@@ -4156,6 +4163,8 @@ snapshots:
   ts-api-utils@2.5.0(typescript@5.9.3):
     dependencies:
       typescript: 5.9.3
+
+  ts-fsrs@5.3.3: {}
 
   tsconfig-paths@3.15.0:
     dependencies:

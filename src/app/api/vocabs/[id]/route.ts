@@ -21,12 +21,14 @@ export async function PATCH(
     const { id } = await params;
     const body = (await request.json()) as {
       canonicalTerm?: string;
+      clozeSentence?: string;
       definition?: string;
       definitionLabels?: unknown;
       exampleSentence?: string;
       partOfSpeech?: string;
     };
     const canonicalTerm = body.canonicalTerm?.trim();
+    const clozeSentence = body.clozeSentence?.trim();
     const definition = body.definition?.trim() ?? "";
     const exampleSentence = body.exampleSentence?.trim() ?? "";
     const normalizedTerm = canonicalTerm ? normalizeQuery(canonicalTerm) : "";
@@ -65,6 +67,9 @@ export async function PATCH(
           : {}),
         definition,
         definition_labels: normalizeDefinitionLabels(body.definitionLabels),
+        ...(body.clozeSentence !== undefined
+          ? { cloze_sentence: clozeSentence || null }
+          : {}),
         example_sentence: exampleSentence || null,
         ...(body.partOfSpeech !== undefined
           ? { part_of_speech: partOfSpeech || null }

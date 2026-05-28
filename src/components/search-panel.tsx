@@ -16,6 +16,8 @@ const outcomeStyles: Record<SearchOutcome, string> = {
     "border-[color:var(--color-warning)] bg-[rgba(179,122,42,0.1)] text-[color:var(--color-foreground)]",
   limit_reached:
     "border-[color:var(--color-warning)] bg-[rgba(179,122,42,0.1)] text-[color:var(--color-foreground)]",
+  review_load_high:
+    "border-[color:var(--color-warning)] bg-[rgba(179,122,42,0.1)] text-[color:var(--color-foreground)]",
   not_found:
     "border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] text-[color:var(--color-foreground)]",
   empty_query:
@@ -57,8 +59,8 @@ export function SearchPanel() {
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[color:var(--color-muted)]">
               {remotePersistenceEnabled
-                ? "Every successful search is saved automatically, de-duped, and synced to Supabase."
-                : "Every successful search is saved automatically. Sign in when you want the library and review history to sync across devices."}
+                ? "Search captures new words automatically when your review queue is under control, then syncs them to Supabase."
+                : "Search captures new words automatically when your review queue is under control. Sign in to sync across devices."}
             </p>
           </div>
 
@@ -202,7 +204,7 @@ export function SearchPanel() {
           <div className="mt-5 space-y-3">
             {dueItems.slice(0, 4).map((item) => (
               <div
-                key={item.id}
+                key={item.reviewCard.id}
                 className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4"
               >
                 <div className="flex items-center justify-between gap-3">

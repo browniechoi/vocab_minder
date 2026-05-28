@@ -13,8 +13,11 @@ import { getAuthenticatedContext } from "@/lib/supabase/route";
 import {
   createFallbackReviewState,
   fetchCardForVocabItem,
+  fetchReviewHydrationForUser,
   fetchReviewStateForCard,
 } from "@/lib/supabase/review-data";
+import { enrichDictionaryEntry } from "@/lib/vocab-enrichment";
+import { isDue, NEW_WORD_DUE_CARD_LIMIT } from "@/lib/review";
 
 async function lookupEntry(query: string): Promise<DictionaryEntry | null> {
   const apiKey = process.env.MERRIAM_API_KEY;
@@ -22,7 +25,8 @@ async function lookupEntry(query: string): Promise<DictionaryEntry | null> {
     throw new Error("MERRIAM_API_KEY is not configured. Add it to .env.local.");
   }
 
-  return lookupMerriamEntry(query, apiKey);
+  const entry = await lookupMerriamEntry(query, apiKey);
+  return entry ? enrichDictionaryEntry(entry) : null;
 }
 
 async function buildReviewBackedVocab(
@@ -31,21 +35,40 @@ async function buildReviewBackedVocab(
   row: VocabRow,
 ) {
   if (!supabase) {
-    return attachReviewState(
+    const vocab = attachReviewState(
       mapVocabRowToPersistedItem(row),
       createFallbackReviewState(row.created_at),
     );
+    return {
+      reviewCards: [],
+      vocab,
+    };
   }
 
   const card = await fetchCardForVocabItem(supabase, userId, row.id);
   const reviewState = card
     ? await fetchReviewStateForCard(supabase, card.id)
     : createFallbackReviewState(row.created_at);
-
-  return attachReviewState(
+  const vocab = attachReviewState(
     mapVocabRowToPersistedItem(row),
     reviewState ?? createFallbackReviewState(row.created_at),
   );
+
+  return {
+    reviewCards:
+      card && reviewState
+        ? [
+            {
+              id: card.id,
+              vocabItemId: card.vocab_item_id,
+              cardType: card.card_type,
+              isActive: card.is_active,
+              reviewState,
+            },
+          ]
+        : [],
+    vocab,
+  };
 }
 
 export async function POST(request: Request) {
@@ -120,6 +143,7 @@ export async function POST(request: Request) {
           definition: entry.definition,
           definition_labels: entry.definitionLabels ?? [],
           example_sentence: entry.exampleSentence,
+          cloze_sentence: entry.clozeSentence ?? null,
           part_of_speech: entry.partOfSpeech,
           pronunciations: entry.pronunciations ?? [],
           notes: entry.notes ?? null,
@@ -137,15 +161,38 @@ export async function POST(request: Request) {
         );
       }
 
+      const reviewBackedVocab = await buildReviewBackedVocab(
+        user.id,
+        supabase,
+        updated,
+      );
+
       return NextResponse.json({
         outcome:
           updated.status === "active" ? "existing_active" : "existing_archived",
         entry,
-        vocab: await buildReviewBackedVocab(user.id, supabase, updated),
+        reviewCards: reviewBackedVocab.reviewCards,
+        vocab: reviewBackedVocab.vocab,
         message:
           updated.status === "active"
             ? "Already in the active vocab list. Search count and freshness were updated."
             : "Already archived. Restore it from Vocabulary if you want it back in review.",
+        profile: mapProfileRowToState(profile),
+      });
+    }
+
+    const { reviewCards } = await fetchReviewHydrationForUser(supabase, user.id);
+    const dueReviewCardCount = reviewCards.filter(
+      (card) => card.isActive && isDue(card.reviewState),
+    ).length;
+    if (dueReviewCardCount >= NEW_WORD_DUE_CARD_LIMIT) {
+      return NextResponse.json({
+        outcome: "review_load_high",
+        entry,
+        vocab: null,
+        reviewCards: [],
+        message:
+          "Review load is high. Clear due cards before adding more new words.",
         profile: mapProfileRowToState(profile),
       });
     }
@@ -181,6 +228,7 @@ export async function POST(request: Request) {
         definition: entry.definition,
         definition_labels: entry.definitionLabels ?? [],
         example_sentence: entry.exampleSentence,
+        cloze_sentence: entry.clozeSentence ?? null,
         part_of_speech: entry.partOfSpeech,
         pronunciations: entry.pronunciations ?? [],
         notes: entry.notes ?? null,
@@ -195,10 +243,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: insertError.message }, { status: 500 });
     }
 
+    const reviewBackedVocab = await buildReviewBackedVocab(
+      user.id,
+      supabase,
+      created,
+    );
+
     return NextResponse.json({
       outcome: "saved",
       entry,
-      vocab: await buildReviewBackedVocab(user.id, supabase, created),
+      reviewCards: reviewBackedVocab.reviewCards,
+      vocab: reviewBackedVocab.vocab,
       message: "Saved and synced to Supabase. Definition data came from Merriam-Webster.",
       profile: mapProfileRowToState(profile),
     });

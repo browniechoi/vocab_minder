@@ -1,7 +1,17 @@
-import type { AppState, DictionaryEntry, VocabItem } from "@/lib/app-types";
+import type {
+  AppState,
+  DictionaryEntry,
+  ReviewCard,
+  ReviewCardType,
+  ReviewState,
+  VocabItem,
+} from "@/lib/app-types";
 import { searchDictionary } from "@/lib/mock-dictionary";
 import { PLAN_LIMITS } from "@/lib/plan";
-import { createInitialReviewState } from "@/lib/review";
+import {
+  createInitialReviewState,
+  shouldUnlockProduction,
+} from "@/lib/review";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -26,6 +36,7 @@ export function createVocabItem(entry: DictionaryEntry, originalQuery: string) {
     definition: entry.definition,
     definitionLabels: entry.definitionLabels,
     exampleSentence: entry.exampleSentence,
+    clozeSentence: entry.clozeSentence,
     pronunciations: entry.pronunciations,
     notes: entry.notes,
     status: "active",
@@ -34,6 +45,29 @@ export function createVocabItem(entry: DictionaryEntry, originalQuery: string) {
     createdAt: now.toISOString(),
     reviewState: createInitialReviewState(now),
   } satisfies VocabItem;
+}
+
+export function createReviewCardForItem(
+  item: VocabItem,
+  cardType: ReviewCardType,
+  reviewState?: ReviewState,
+) {
+  return {
+    id: crypto.randomUUID(),
+    vocabItemId: item.id,
+    cardType,
+    isActive: item.status === "active",
+    reviewState: reviewState ?? createInitialReviewState(new Date(item.createdAt)),
+  } satisfies ReviewCard;
+}
+
+export function createInitialReviewCardsForItem(item: VocabItem) {
+  return [
+    createReviewCardForItem(item, "recognition", item.reviewState),
+    ...(shouldUnlockProduction(item.reviewState)
+      ? [createReviewCardForItem(item, "production")]
+      : []),
+  ];
 }
 
 function seedItem(
@@ -77,6 +111,7 @@ function seedItem(
     definition: entry.definition,
     definitionLabels: entry.definitionLabels,
     exampleSentence: entry.exampleSentence,
+    clozeSentence: entry.clozeSentence,
     pronunciations: entry.pronunciations,
     notes: entry.notes,
     status: options.status ?? "active",
@@ -90,6 +125,11 @@ function seedItem(
       repetitionCount: options.repetitionCount ?? 1,
       lapseCount: options.lapseCount ?? 0,
       lastReviewedAt,
+      stabilityDays: options.intervalDays ?? 1,
+      difficulty: options.easeFactor ?? 2.5,
+      fsrsState: "Review",
+      learningSteps: 0,
+      desiredRetention: 0.92,
     },
   } satisfies VocabItem;
 }
@@ -97,49 +137,52 @@ function seedItem(
 export function createSeedState(): AppState {
   const now = new Date();
 
+  const items = [
+    seedItem("meticulous", {
+      searchCount: 4,
+      createdOffsetDays: 9,
+      lastSearchedOffsetHours: 3,
+      dueOffsetHours: -7,
+      intervalDays: 4,
+      easeFactor: 2.62,
+      repetitionCount: 4,
+    }),
+    seedItem("foster", {
+      searchCount: 2,
+      createdOffsetDays: 5,
+      lastSearchedOffsetHours: 5,
+      dueOffsetHours: 12,
+      intervalDays: 2,
+      easeFactor: 2.5,
+      repetitionCount: 2,
+    }),
+    seedItem("nuance", {
+      searchCount: 3,
+      createdOffsetDays: 7,
+      lastSearchedOffsetHours: 8,
+      dueOffsetHours: -1,
+      intervalDays: 3,
+      easeFactor: 2.44,
+      repetitionCount: 3,
+      lapseCount: 1,
+    }),
+    seedItem("resilient", {
+      status: "archived",
+      searchCount: 1,
+      createdOffsetDays: 12,
+      lastSearchedOffsetHours: 26,
+      dueOffsetHours: 36,
+      intervalDays: 7,
+      easeFactor: 2.68,
+      repetitionCount: 5,
+    }),
+  ];
+
   return {
     planTier: "free",
     activeLimit: PLAN_LIMITS.free,
-    items: [
-      seedItem("meticulous", {
-        searchCount: 4,
-        createdOffsetDays: 9,
-        lastSearchedOffsetHours: 3,
-        dueOffsetHours: -7,
-        intervalDays: 4,
-        easeFactor: 2.62,
-        repetitionCount: 4,
-      }),
-      seedItem("foster", {
-        searchCount: 2,
-        createdOffsetDays: 5,
-        lastSearchedOffsetHours: 5,
-        dueOffsetHours: 12,
-        intervalDays: 2,
-        easeFactor: 2.5,
-        repetitionCount: 2,
-      }),
-      seedItem("nuance", {
-        searchCount: 3,
-        createdOffsetDays: 7,
-        lastSearchedOffsetHours: 8,
-        dueOffsetHours: -1,
-        intervalDays: 3,
-        easeFactor: 2.44,
-        repetitionCount: 3,
-        lapseCount: 1,
-      }),
-      seedItem("resilient", {
-        status: "archived",
-        searchCount: 1,
-        createdOffsetDays: 12,
-        lastSearchedOffsetHours: 26,
-        dueOffsetHours: 36,
-        intervalDays: 7,
-        easeFactor: 2.68,
-        repetitionCount: 5,
-      }),
-    ],
+    items,
+    reviewCards: items.flatMap(createInitialReviewCardsForItem),
     reviewEvents: [
       {
         id: "seed-event-meticulous",

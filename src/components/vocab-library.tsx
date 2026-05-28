@@ -21,6 +21,7 @@ export function VocabLibrary() {
     updateVocabBack,
   } = useAppState();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editClozeSentence, setEditClozeSentence] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
   const [editDefinitionLabels, setEditDefinitionLabels] = useState("");
   const [editExampleSentence, setEditExampleSentence] = useState("");
@@ -35,6 +36,7 @@ export function VocabLibrary() {
   function startEditing(item: VocabItem) {
     setEditMessage(null);
     setEditingItemId(item.id);
+    setEditClozeSentence(item.clozeSentence ?? "");
     setEditDefinition(item.definition);
     setEditDefinitionLabels(item.definitionLabels?.join(", ") ?? "");
     setEditExampleSentence(item.exampleSentence);
@@ -132,6 +134,7 @@ export function VocabLibrary() {
                               editTerm.trim() === item.canonicalTerm
                                 ? undefined
                                 : editTerm,
+                            clozeSentence: editClozeSentence,
                             definition: editDefinition,
                             definitionLabels:
                               parseDefinitionLabelText(editDefinitionLabels),
@@ -215,6 +218,19 @@ export function VocabLibrary() {
                           className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm italic leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
                         />
                       </label>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Cloze
+                        </span>
+                        <textarea
+                          value={editClozeSentence}
+                          onChange={(event) =>
+                            setEditClozeSentence(event.target.value)
+                          }
+                          placeholder="Use _____ for the hidden word."
+                          className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm italic leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
                       {editMessage ? (
                         <p className="rounded-[18px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-4 py-3 text-sm text-[color:var(--color-foreground)]">
                           {editMessage}
@@ -265,6 +281,11 @@ export function VocabLibrary() {
                       <p className="mt-3 text-sm italic leading-7 text-[color:var(--color-muted)]">
                         “{item.exampleSentence}”
                       </p>
+                      {item.clozeSentence ? (
+                        <p className="mt-2 text-sm italic leading-7 text-[color:var(--color-muted)]">
+                          Cloze: “{item.clozeSentence}”
+                        </p>
+                      ) : null}
                       <div className="mt-5 flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
                         <span>{item.searchCount} searches</span>
                         <span>{formatDueLabel(item.reviewState.dueAt)}</span>

@@ -6,9 +6,10 @@ import {
   type DictionaryEntry,
   type PersistedVocabItem,
   type ProfileState,
+  type ReviewCard,
   type ReviewEvent,
+  type ReviewQueueItem,
   type ReviewRating,
-  type ReviewState,
   type SearchOutcome,
   type VocabItem,
 } from "@/lib/app-types";
@@ -17,10 +18,21 @@ import {
   attachReviewState,
   createEmptyState,
 } from "@/lib/persisted-state";
-import { createSeedState, createVocabItem, normalizeQuery } from "@/lib/mock-state";
+import {
+  createInitialReviewCardsForItem,
+  createReviewCardForItem,
+  createSeedState,
+  createVocabItem,
+  normalizeQuery,
+} from "@/lib/mock-state";
 import { PLAN_LIMITS } from "@/lib/plan";
 import { getPreviewStorageKey } from "@/lib/preview-config";
-import { applyReview, isDue } from "@/lib/review";
+import {
+  applyReview,
+  isDue,
+  NEW_WORD_DUE_CARD_LIMIT,
+  shouldUnlockProduction,
+} from "@/lib/review";
 
 type SearchResult = {
   outcome: SearchOutcome;
@@ -38,12 +50,14 @@ type DictionaryLookupResponse = {
 type BootstrapResponse = {
   items: VocabItem[];
   profile: ProfileState;
+  reviewCards: ReviewCard[];
   reviewEvents: ReviewEvent[];
 };
 
 type RemoteSearchResponse = {
   outcome: SearchOutcome;
   entry: DictionaryEntry | null;
+  reviewCards?: ReviewCard[];
   vocab: VocabItem | null;
   message: string;
   profile: ProfileState;
@@ -62,12 +76,14 @@ type RemoteRestoreResponse = {
 };
 
 type RemoteReviewAnswerResponse = {
+  reviewCard: ReviewCard;
   reviewEvent: ReviewEvent;
-  reviewState: ReviewState;
+  unlockedCard?: ReviewCard;
 };
 
 type VocabBackUpdate = {
   canonicalTerm?: string;
+  clozeSentence?: string;
   definition: string;
   definitionLabels?: string[];
   exampleSentence: string;
@@ -83,7 +99,7 @@ type AppStateContextValue = {
   state: AppState;
   activeItems: VocabItem[];
   archivedItems: VocabItem[];
-  dueItems: VocabItem[];
+  dueItems: ReviewQueueItem[];
   activeCount: number;
   reviewsToday: number;
   remotePersistenceEnabled: boolean;
@@ -91,7 +107,10 @@ type AppStateContextValue = {
   archiveItem: (id: string) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<{ success: boolean; message: string }>;
-  answerCard: (id: string, rating: ReviewRating) => Promise<AnswerCardResult>;
+  answerCard: (
+    cardId: string,
+    rating: ReviewRating,
+  ) => Promise<AnswerCardResult>;
   updateVocabBack: (
     id: string,
     update: VocabBackUpdate,
@@ -125,7 +144,10 @@ function readFullPreviewState(storageKey: string) {
       return null;
     }
 
-    return parsed;
+    return ensureReviewCards({
+      ...parsed,
+      reviewCards: parsed.reviewCards ?? [],
+    });
   } catch {
     return null;
   }
@@ -153,6 +175,102 @@ function applyProfileState(
     planTier: profile.planTier,
     activeLimit: profile.activeLimit,
   };
+}
+
+function getRecognitionCard(item: VocabItem, reviewCards: ReviewCard[]) {
+  return reviewCards.find(
+    (card) => card.vocabItemId === item.id && card.cardType === "recognition",
+  );
+}
+
+function withPrimaryReviewStates(state: AppState) {
+  return state.items.map((item) => ({
+    ...item,
+    reviewState:
+      getRecognitionCard(item, state.reviewCards)?.reviewState ??
+      item.reviewState,
+  }));
+}
+
+function ensureReviewCards(state: AppState): AppState {
+  const existingCards = state.reviewCards ?? [];
+  const nextCards = [...existingCards];
+
+  for (const item of state.items) {
+    if (!getRecognitionCard(item, nextCards)) {
+      nextCards.push(createReviewCardForItem(item, "recognition", item.reviewState));
+    }
+
+    const recognitionState =
+      getRecognitionCard(item, nextCards)?.reviewState ?? item.reviewState;
+    const hasProductionCard = nextCards.some(
+      (card) => card.vocabItemId === item.id && card.cardType === "production",
+    );
+
+    if (!hasProductionCard && shouldUnlockProduction(recognitionState)) {
+      nextCards.push(createReviewCardForItem(item, "production"));
+    }
+  }
+
+  return {
+    ...state,
+    items: withPrimaryReviewStates({
+      ...state,
+      reviewCards: nextCards,
+    }),
+    reviewCards: nextCards,
+  };
+}
+
+function buildDueItems(items: VocabItem[], reviewCards: ReviewCard[]) {
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const seenVocabIds = new Set<string>();
+
+  return reviewCards
+    .filter((card) => card.isActive && isDue(card.reviewState))
+    .sort(
+      (left, right) =>
+        new Date(left.reviewState.dueAt).getTime() -
+        new Date(right.reviewState.dueAt).getTime(),
+    )
+    .flatMap((card) => {
+      const item = itemById.get(card.vocabItemId);
+      if (!item || item.status !== "active" || seenVocabIds.has(item.id)) {
+        return [];
+      }
+
+      seenVocabIds.add(item.id);
+      return [
+        {
+          ...item,
+          reviewCard: card,
+          reviewState: card.reviewState,
+        } satisfies ReviewQueueItem,
+      ];
+    });
+}
+
+function upsertReviewCards(
+  reviewCards: ReviewCard[],
+  nextCards: Array<ReviewCard | undefined>,
+) {
+  let cards = [...reviewCards];
+
+  for (const nextCard of nextCards) {
+    if (!nextCard) {
+      continue;
+    }
+
+    const existingIndex = cards.findIndex((card) => card.id === nextCard.id);
+    if (existingIndex === -1) {
+      cards = [nextCard, ...cards];
+      continue;
+    }
+
+    cards = cards.map((card) => (card.id === nextCard.id ? nextCard : card));
+  }
+
+  return cards;
 }
 
 async function lookupDictionaryEntry(
@@ -240,6 +358,7 @@ export function AppStateProvider({
           planTier: payload.profile.planTier,
           activeLimit: payload.profile.activeLimit,
           items: payload.items,
+          reviewCards: payload.reviewCards,
           reviewEvents: payload.reviewEvents,
         });
       } catch {
@@ -326,6 +445,7 @@ export function AppStateProvider({
                 definition: entry.definition,
                 definitionLabels: entry.definitionLabels,
                 exampleSentence: entry.exampleSentence,
+                clozeSentence: entry.clozeSentence,
                 pronunciations: entry.pronunciations,
                 notes: entry.notes,
               };
@@ -344,21 +464,29 @@ export function AppStateProvider({
     };
   }, [remotePersistenceEnabled, state.items]);
 
-  const activeItems = state.items
+  const currentReviewCards = state.reviewCards ?? [];
+  const itemsWithPrimaryReviewStates = withPrimaryReviewStates({
+    ...state,
+    reviewCards: currentReviewCards,
+  });
+  const activeItems = itemsWithPrimaryReviewStates
     .filter((item) => item.status === "active")
     .sort(
       (left, right) =>
         new Date(left.reviewState.dueAt).getTime() -
         new Date(right.reviewState.dueAt).getTime(),
     );
-  const archivedItems = state.items
+  const archivedItems = itemsWithPrimaryReviewStates
     .filter((item) => item.status === "archived")
     .sort(
       (left, right) =>
         new Date(right.lastSearchedAt).getTime() -
         new Date(left.lastSearchedAt).getTime(),
     );
-  const dueItems = activeItems.filter((item) => isDue(item.reviewState));
+  const dueItems = buildDueItems(
+    activeItems,
+    currentReviewCards,
+  );
   const activeCount = activeItems.length;
   const reviewsToday = countReviewsToday(state);
 
@@ -439,6 +567,7 @@ export function AppStateProvider({
               definition: entry.definition,
               definitionLabels: entry.definitionLabels,
               exampleSentence: entry.exampleSentence,
+              clozeSentence: entry.clozeSentence,
               partOfSpeech: entry.partOfSpeech,
               pronunciations: entry.pronunciations,
               notes: entry.notes,
@@ -467,6 +596,28 @@ export function AppStateProvider({
             };
           }
 
+          const activeItemIds = new Set(
+            current.items
+              .filter((item) => item.status === "active")
+              .map((item) => item.id),
+          );
+          const dueReviewCardCount = current.reviewCards.filter(
+            (card) =>
+              card.isActive &&
+              activeItemIds.has(card.vocabItemId) &&
+              isDue(card.reviewState),
+          ).length;
+          if (dueReviewCardCount >= NEW_WORD_DUE_CARD_LIMIT) {
+            result = {
+              outcome: "review_load_high",
+              entry,
+              vocab: null,
+              message:
+                "Review load is high. Clear due cards before adding more new words.",
+            };
+            return current;
+          }
+
           if (countActive(current.items) >= current.activeLimit) {
             result = {
               outcome: "limit_reached",
@@ -490,6 +641,10 @@ export function AppStateProvider({
           return {
             ...current,
             items: [created, ...current.items],
+            reviewCards: [
+              ...createInitialReviewCardsForItem(created),
+              ...current.reviewCards,
+            ],
           };
         });
 
@@ -528,6 +683,9 @@ export function AppStateProvider({
             nextState = {
               ...nextState,
               items: upsertItem(nextState.items, remotePayload.vocab),
+              reviewCards: upsertReviewCards(nextState.reviewCards, [
+                ...(remotePayload.reviewCards ?? []),
+              ]),
             };
           }
 
@@ -557,6 +715,9 @@ export function AppStateProvider({
           items: current.items.map((item) =>
             item.id === id ? { ...item, status: "archived" } : item,
           ),
+          reviewCards: current.reviewCards.map((card) =>
+            card.vocabItemId === id ? { ...card, isActive: false } : card,
+          ),
         }));
         return;
       }
@@ -581,6 +742,9 @@ export function AppStateProvider({
               ? attachReviewState(nextVocab, item.reviewState)
               : item,
           ),
+          reviewCards: current.reviewCards.map((card) =>
+            card.vocabItemId === id ? { ...card, isActive: false } : card,
+          ),
         }));
       } catch {
         // Keep the current view stable if the archive request fails.
@@ -591,6 +755,9 @@ export function AppStateProvider({
         setState((current) => ({
           ...current,
           items: current.items.filter((item) => item.id !== id),
+          reviewCards: current.reviewCards.filter(
+            (card) => card.vocabItemId !== id,
+          ),
           reviewEvents: current.reviewEvents.filter(
             (event) => event.vocabItemId !== id,
           ),
@@ -610,6 +777,9 @@ export function AppStateProvider({
         setState((current) => ({
           ...current,
           items: current.items.filter((item) => item.id !== id),
+          reviewCards: current.reviewCards.filter(
+            (card) => card.vocabItemId !== id,
+          ),
           reviewEvents: current.reviewEvents.filter(
             (event) => event.vocabItemId !== id,
           ),
@@ -640,6 +810,9 @@ export function AppStateProvider({
             items: current.items.map((item) =>
               item.id === id ? { ...item, status: "active" } : item,
             ),
+            reviewCards: current.reviewCards.map((card) =>
+              card.vocabItemId === id ? { ...card, isActive: true } : card,
+            ),
           };
         });
 
@@ -665,6 +838,9 @@ export function AppStateProvider({
               items: current.items.map((item) =>
                 item.id === id ? updated : item,
               ),
+              reviewCards: current.reviewCards.map((card) =>
+                card.vocabItemId === id ? { ...card, isActive: true } : card,
+              ),
             };
           }
 
@@ -682,7 +858,7 @@ export function AppStateProvider({
         };
       }
     },
-    async answerCard(id, rating) {
+    async answerCard(cardId, rating) {
       if (remotePersistenceEnabled) {
         try {
           const response = await fetch("/api/review/answer", {
@@ -690,7 +866,7 @@ export function AppStateProvider({
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ rating, vocabItemId: id }),
+            body: JSON.stringify({ cardId, rating }),
           });
           const payload = (await response.json()) as
             | RemoteReviewAnswerResponse
@@ -699,7 +875,7 @@ export function AppStateProvider({
           if (
             !response.ok ||
             !("reviewEvent" in payload) ||
-            !("reviewState" in payload)
+            !("reviewCard" in payload)
           ) {
             const errorMessage =
               "message" in payload ? payload.message : undefined;
@@ -714,10 +890,15 @@ export function AppStateProvider({
           setState((current) => ({
             ...current,
             items: current.items.map((item) =>
-              item.id === id
-                ? { ...item, reviewState: payload.reviewState }
+              item.id === payload.reviewCard.vocabItemId &&
+              payload.reviewCard.cardType === "recognition"
+                ? { ...item, reviewState: payload.reviewCard.reviewState }
                 : item,
             ),
+            reviewCards: upsertReviewCards(current.reviewCards, [
+              payload.reviewCard,
+              payload.unlockedCard,
+            ]),
             reviewEvents: [payload.reviewEvent, ...current.reviewEvents].slice(
               0,
               100,
@@ -736,26 +917,60 @@ export function AppStateProvider({
       const reviewedIso = reviewedAt.toISOString();
 
       setState((current) => {
-        const target = current.items.find((item) => item.id === id);
+        const targetCard = current.reviewCards.find((card) => card.id === cardId);
+        if (!targetCard) {
+          return current;
+        }
+
+        const target = current.items.find(
+          (item) => item.id === targetCard.vocabItemId,
+        );
         if (!target) {
           return current;
         }
 
-        const nextReviewState = applyReview(target.reviewState, rating, reviewedAt);
+        const nextReviewState = applyReview(
+          targetCard.reviewState,
+          rating,
+          reviewedAt,
+        );
+        const updatedCard = {
+          ...targetCard,
+          reviewState: nextReviewState,
+        };
+        const shouldCreateProduction =
+          targetCard.cardType === "recognition" &&
+          shouldUnlockProduction(nextReviewState) &&
+          !current.reviewCards.some(
+            (card) =>
+              card.vocabItemId === target.id &&
+              card.cardType === "production",
+          );
+        const unlockedCard = shouldCreateProduction
+          ? createReviewCardForItem(target, "production")
+          : undefined;
         const reviewEvent = {
           id: crypto.randomUUID(),
-          vocabItemId: id,
+          cardId,
+          cardType: targetCard.cardType,
+          vocabItemId: target.id,
           rating,
           reviewedAt: reviewedIso,
-          previousDueAt: target.reviewState.dueAt,
+          previousDueAt: targetCard.reviewState.dueAt,
           newDueAt: nextReviewState.dueAt,
         };
 
         return {
           ...current,
           items: current.items.map((item) =>
-            item.id === id ? { ...item, reviewState: nextReviewState } : item,
+            item.id === target.id && targetCard.cardType === "recognition"
+              ? { ...item, reviewState: nextReviewState }
+              : item,
           ),
+          reviewCards: upsertReviewCards(current.reviewCards, [
+            updatedCard,
+            unlockedCard,
+          ]),
           reviewEvents: [reviewEvent, ...current.reviewEvents].slice(0, 100),
         };
       });
@@ -763,6 +978,7 @@ export function AppStateProvider({
     },
     async updateVocabBack(id, update) {
       const canonicalTerm = update.canonicalTerm?.trim();
+      const clozeSentence = update.clozeSentence?.trim();
       const definition = update.definition.trim();
       const exampleSentence = update.exampleSentence.trim();
       const definitionLabels = normalizeDefinitionLabels(
@@ -803,6 +1019,10 @@ export function AppStateProvider({
                   normalizedTerm: normalizedTerm || item.normalizedTerm,
                   definition,
                   definitionLabels,
+                  clozeSentence:
+                    update.clozeSentence !== undefined
+                      ? clozeSentence || undefined
+                      : item.clozeSentence,
                   exampleSentence:
                     exampleSentence || "No example sentence available.",
                   partOfSpeech:
@@ -828,6 +1048,7 @@ export function AppStateProvider({
           },
           body: JSON.stringify({
             canonicalTerm,
+            clozeSentence,
             definition,
             definitionLabels,
             exampleSentence,
@@ -914,10 +1135,20 @@ export function AppStateProvider({
 
       setState((current) => ({
         ...current,
-        items: current.items.map((item) => ({
-          ...item,
-          reviewState: attachReviewState(item, null).reviewState,
-        })),
+        items: current.items.map((item) => {
+          const reviewState = attachReviewState(item, null).reviewState;
+          return {
+            ...item,
+            reviewState,
+          };
+        }),
+        reviewCards: current.items.flatMap((item) => {
+          const reviewState = attachReviewState(item, null).reviewState;
+          return createInitialReviewCardsForItem({
+            ...item,
+            reviewState,
+          });
+        }),
         reviewEvents: [],
       }));
     },

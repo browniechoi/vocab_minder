@@ -1,8 +1,14 @@
-import type { ReviewEvent, ReviewState } from "@/lib/app-types";
+import type {
+  ReviewCard,
+  ReviewCardType,
+  ReviewEvent,
+  ReviewState,
+} from "@/lib/app-types";
 import {
   type CardRow,
   type ReviewEventRow,
   type ReviewStateRow,
+  mapReviewCardRow,
   mapReviewEventRow,
   mapReviewStateRow,
 } from "@/lib/persisted-state";
@@ -17,7 +23,7 @@ export async function fetchCardsForUser(
 ) {
   const { data, error } = await supabase
     .from("cards")
-    .select("id, vocab_item_id")
+    .select("id, vocab_item_id, card_type, is_active")
     .eq("user_id", userId)
     .returns<CardRow[]>();
 
@@ -32,12 +38,14 @@ export async function fetchCardForVocabItem(
   supabase: SupabaseRouteClient,
   userId: string,
   vocabItemId: string,
+  cardType: ReviewCardType = "recognition",
 ) {
   const { data, error } = await supabase
     .from("cards")
-    .select("id, vocab_item_id")
+    .select("id, vocab_item_id, card_type, is_active")
     .eq("user_id", userId)
     .eq("vocab_item_id", vocabItemId)
+    .eq("card_type", cardType)
     .limit(1)
     .returns<CardRow[]>();
 
@@ -55,7 +63,7 @@ export async function fetchReviewStateForCard(
   const { data, error } = await supabase
     .from("review_states")
     .select(
-      "card_id, due_at, interval_days, ease_factor, repetition_count, lapse_count, last_reviewed_at",
+      "card_id, due_at, interval_days, ease_factor, repetition_count, lapse_count, last_reviewed_at, stability_days, difficulty, fsrs_state, learning_steps, desired_retention",
     )
     .eq("card_id", cardId)
     .maybeSingle<ReviewStateRow>();
@@ -77,6 +85,7 @@ export async function fetchReviewHydrationForUser(
   if (cardIds.length === 0) {
     return {
       reviewEvents: [] as ReviewEvent[],
+      reviewCards: [] as ReviewCard[],
       reviewStatesByVocabItemId: new Map<string, ReviewState>(),
     };
   }
@@ -86,7 +95,7 @@ export async function fetchReviewHydrationForUser(
       supabase
         .from("review_states")
         .select(
-          "card_id, due_at, interval_days, ease_factor, repetition_count, lapse_count, last_reviewed_at",
+          "card_id, due_at, interval_days, ease_factor, repetition_count, lapse_count, last_reviewed_at, stability_days, difficulty, fsrs_state, learning_steps, desired_retention",
         )
         .in("card_id", cardIds)
         .returns<ReviewStateRow[]>(),
@@ -113,7 +122,9 @@ export async function fetchReviewHydrationForUser(
   const vocabItemIdByCardId = new Map(
     cards.map((card) => [card.id, card.vocab_item_id]),
   );
+  const cardById = new Map(cards.map((card) => [card.id, card]));
   const reviewStatesByVocabItemId = new Map<string, ReviewState>();
+  const reviewStatesByCardId = new Map<string, ReviewState>();
 
   for (const row of reviewStateRows ?? []) {
     const vocabItemId = vocabItemIdByCardId.get(row.card_id);
@@ -121,8 +132,22 @@ export async function fetchReviewHydrationForUser(
       continue;
     }
 
-    reviewStatesByVocabItemId.set(vocabItemId, mapReviewStateRow(row));
+    const reviewState = mapReviewStateRow(row);
+    reviewStatesByCardId.set(row.card_id, reviewState);
+
+    const card = cardById.get(row.card_id);
+    if (card?.card_type === "recognition") {
+      reviewStatesByVocabItemId.set(vocabItemId, reviewState);
+    }
   }
+
+  const reviewCards = cards.map((card) =>
+    mapReviewCardRow(
+      card,
+      reviewStatesByCardId.get(card.id) ??
+        createFallbackReviewState(new Date().toISOString()),
+    ),
+  );
 
   const reviewEvents = (reviewEventRows ?? []).flatMap((row) => {
     const vocabItemId = vocabItemIdByCardId.get(row.card_id);
@@ -130,11 +155,12 @@ export async function fetchReviewHydrationForUser(
       return [];
     }
 
-    return [mapReviewEventRow(row, vocabItemId)];
+    return [mapReviewEventRow(row, vocabItemId, cardById.get(row.card_id)?.card_type)];
   });
 
   return {
     reviewEvents,
+    reviewCards,
     reviewStatesByVocabItemId,
   };
 }
@@ -152,8 +178,14 @@ export async function ensureCardForVocabItem(
     status: "active" | "archived";
     vocabItemId: string;
   },
+  cardType: ReviewCardType = "recognition",
 ) {
-  const existing = await fetchCardForVocabItem(supabase, userId, seed.vocabItemId);
+  const existing = await fetchCardForVocabItem(
+    supabase,
+    userId,
+    seed.vocabItemId,
+    cardType,
+  );
   if (existing) {
     return existing;
   }
@@ -163,11 +195,14 @@ export async function ensureCardForVocabItem(
     .insert({
       user_id: userId,
       vocab_item_id: seed.vocabItemId,
-      front_text: seed.canonicalTerm,
-      back_text: seed.definition,
+      card_type: cardType,
+      front_text:
+        cardType === "production" ? seed.definition : seed.canonicalTerm,
+      back_text:
+        cardType === "production" ? seed.canonicalTerm : seed.definition,
       is_active: seed.status === "active",
     })
-    .select("id, vocab_item_id")
+    .select("id, vocab_item_id, card_type, is_active")
     .single<CardRow>();
 
   if (error) {
@@ -196,6 +231,11 @@ export async function ensureReviewStateForCard(
     repetition_count: initialState.repetitionCount,
     lapse_count: initialState.lapseCount,
     last_reviewed_at: initialState.lastReviewedAt,
+    stability_days: initialState.stabilityDays,
+    difficulty: initialState.difficulty,
+    fsrs_state: initialState.fsrsState,
+    learning_steps: initialState.learningSteps,
+    desired_retention: initialState.desiredRetention,
   });
 
   if (error) {

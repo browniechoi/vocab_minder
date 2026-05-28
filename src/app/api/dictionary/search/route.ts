@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { lookupMerriamEntry } from "@/lib/merriam";
+import { enrichDictionaryEntry } from "@/lib/vocab-enrichment";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -26,7 +27,10 @@ export async function GET(request: Request) {
   try {
     const entry = await lookupMerriamEntry(query, apiKey);
 
-    return NextResponse.json({ entry, message: null });
+    return NextResponse.json({
+      entry: entry ? await enrichDictionaryEntry(entry) : null,
+      message: null,
+    });
   } catch (error) {
     return NextResponse.json(
       {
