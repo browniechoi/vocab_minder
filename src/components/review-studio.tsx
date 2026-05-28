@@ -25,6 +25,11 @@ const ratingTone: Record<ReviewRating, string> = {
     "border-[color:var(--color-foreground)] text-[color:var(--color-foreground)] hover:bg-[rgba(17,32,57,0.08)]",
 };
 
+type SessionFeedback = {
+  message: string;
+  tone: "error" | "success";
+};
+
 function getCardTypeLabel(cardType: string) {
   if (cardType === "production") {
     return "Reverse recall";
@@ -59,6 +64,37 @@ function getClozeSentence(term: string, exampleSentence: string, clozeSentence?:
   return exampleSentence;
 }
 
+function normalizeTypedAnswer(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’‘]/g, "'")
+    .replace(/:\d+$/u, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9']+/g, " ")
+    .trim();
+}
+
+function getAcceptedTypedAnswers(canonicalTerm: string, normalizedTerm: string) {
+  const baseTerm = canonicalTerm.replace(/:\d+$/u, "");
+  const baseNormalizedTerm = normalizedTerm.replace(/:\d+$/u, "");
+
+  return new Set(
+    [canonicalTerm, baseTerm, normalizedTerm, baseNormalizedTerm]
+      .map(normalizeTypedAnswer)
+      .filter(Boolean),
+  );
+}
+
+function removeTypedAnswer(
+  answers: Record<string, string>,
+  cardId: string,
+): Record<string, string> {
+  const nextAnswers = { ...answers };
+  delete nextAnswers[cardId];
+  return nextAnswers;
+}
+
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday, updateVocabBack } = useAppState();
   const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
@@ -72,6 +108,8 @@ export function ReviewStudio() {
   const [isSavingBack, setIsSavingBack] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revealedCardId, setRevealedCardId] = useState<string | null>(null);
+  const [sessionFeedback, setSessionFeedback] =
+    useState<SessionFeedback | null>(null);
   const [typedAnswers, setTypedAnswers] = useState<Record<string, string>>({});
 
   const dueItemIds = new Set(dueItems.map((item) => item.reviewCard.id));
@@ -136,6 +174,65 @@ export function ReviewStudio() {
     ? getReviewRetrievability(current.reviewState)
     : null;
 
+  async function checkProductionAnswer() {
+    if (!current || !currentCardId || isSubmitting || isSavingBack) {
+      return;
+    }
+
+    setBackEditMessage(null);
+    setEditingBackCardId(null);
+    setErrorMessage(null);
+
+    const normalizedAnswer = normalizeTypedAnswer(typedAnswer);
+    if (!normalizedAnswer) {
+      setSessionFeedback({
+        message: "Type the word before checking.",
+        tone: "error",
+      });
+      return;
+    }
+
+    const acceptedAnswers = getAcceptedTypedAnswers(
+      current.canonicalTerm,
+      current.normalizedTerm,
+    );
+    if (!acceptedAnswers.has(normalizedAnswer)) {
+      setRevealedCardId(currentCardId);
+      setSessionFeedback({
+        message:
+          "Not quite. The correct spelling is shown below; self-grade this card.",
+        tone: "error",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await answerCard(currentCardId, "easy");
+      if (!result.success) {
+        setErrorMessage(
+          result.message ??
+            "Review answer failed before the session queue could advance.",
+        );
+        return;
+      }
+
+      setDeferredAgainIds((currentIds) =>
+        currentIds.filter((id) => id !== currentCardId),
+      );
+      setTypedAnswers((currentAnswers) =>
+        removeTypedAnswer(currentAnswers, currentCardId),
+      );
+      setRevealedCardId(null);
+      setSessionFeedback({
+        message: "Correct. Marked Easy and moved forward.",
+        tone: "success",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   if (!current) {
     return (
       <div className="grid gap-6 lg:grid-cols-[1fr_0.7fr]">
@@ -150,6 +247,17 @@ export function ReviewStudio() {
             That is the right kind of empty state. Search a few more words or
             wait for cards to come due again.
           </p>
+          {sessionFeedback ? (
+            <p
+              className={`mt-4 rounded-[18px] px-4 py-3 text-sm font-medium ${
+                sessionFeedback.tone === "success"
+                  ? "bg-[rgba(47,139,115,0.1)] text-[color:var(--color-accent-secondary)]"
+                  : "bg-[rgba(187,79,59,0.08)] text-[color:var(--color-danger)]"
+              }`}
+            >
+              {sessionFeedback.message}
+            </p>
+          ) : null}
         </div>
 
         <div className="soft-panel rounded-[32px] px-6 py-6">
@@ -209,10 +317,17 @@ export function ReviewStudio() {
                     if (!currentCardId) {
                       return;
                     }
+                    setSessionFeedback(null);
                     setTypedAnswers((currentAnswers) => ({
                       ...currentAnswers,
                       [currentCardId]: nextAnswer,
                     }));
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void checkProductionAnswer();
+                    }
                   }}
                   disabled={revealed || isSubmitting || isSavingBack}
                   autoCapitalize="none"
@@ -371,6 +486,9 @@ export function ReviewStudio() {
                           </span>
                         </p>
                       ) : null}
+                      <p className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Correct spelling
+                      </p>
                       <h2 className="text-4xl font-semibold text-[color:var(--color-foreground)]">
                         {current.canonicalTerm}
                       </h2>
@@ -394,7 +512,7 @@ export function ReviewStudio() {
                   </p>
                 ) : null}
               </div>
-              {editingBackCardId !== current.id ? (
+              {editingBackCardId !== current.id && !isProductionCard ? (
                 <p className="rounded-[22px] bg-[rgba(47,139,115,0.08)] px-4 py-4 text-sm italic leading-7 text-[color:var(--color-foreground)]">
                   “{current.exampleSentence}”
                 </p>
@@ -403,12 +521,29 @@ export function ReviewStudio() {
           ) : null}
         </div>
 
+        {sessionFeedback ? (
+          <div
+            className={`mt-4 rounded-[22px] border px-4 py-4 text-sm font-medium leading-7 ${
+              sessionFeedback.tone === "success"
+                ? "border-[color:var(--color-accent-secondary)] bg-[rgba(47,139,115,0.08)] text-[color:var(--color-accent-secondary)]"
+                : "border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] text-[color:var(--color-danger)]"
+            }`}
+          >
+            {sessionFeedback.message}
+          </div>
+        ) : null}
+
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
             aria-pressed={revealed}
-            onClick={() => {
+            onClick={async () => {
               setErrorMessage(null);
+              if (isProductionCard && !revealed) {
+                await checkProductionAnswer();
+                return;
+              }
+              setSessionFeedback(null);
               if (revealed) {
                 setBackEditMessage(null);
                 setEditingBackCardId(null);
@@ -427,7 +562,7 @@ export function ReviewStudio() {
               : revealed
                 ? "Unreveal answer"
                 : isProductionCard
-                  ? "Check answer"
+                  ? "Check spelling"
                   : "Reveal answer"}
           </button>
           {ratingPreviews.map(({ nextDueLabel, nextIntervalLabel, rating }) => (
@@ -443,6 +578,7 @@ export function ReviewStudio() {
               onClick={async () => {
                 const currentId = current.reviewCard.id;
                 setErrorMessage(null);
+                setSessionFeedback(null);
                 setIsSubmitting(true);
                 try {
                   const result = await answerCard(currentId, rating);
@@ -463,6 +599,9 @@ export function ReviewStudio() {
                   setBackEditMessage(null);
                   setEditingBackCardId(null);
                   setRevealedCardId(null);
+                  setTypedAnswers((currentAnswers) =>
+                    removeTypedAnswer(currentAnswers, currentId),
+                  );
                 } finally {
                   setIsSubmitting(false);
                 }
