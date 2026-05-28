@@ -60,7 +60,7 @@ select {
 .soft-panel {
   border: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-surface-strong) 88%, white 12%);
-  box-shadow: 0 14px 45px var(--color-shadow);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--color-shadow) 70%, transparent);
 }
 
 .dotted-grid {

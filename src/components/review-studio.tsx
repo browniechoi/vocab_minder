@@ -235,15 +235,15 @@ export function ReviewStudio() {
 
   if (!current) {
     return (
-      <div className="grid gap-6 lg:grid-cols-[1fr_0.7fr]">
-        <div className="soft-panel rounded-[32px] px-6 py-6">
+      <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
+        <div className="soft-panel rounded-[24px] px-5 py-5">
           <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
             Queue Complete
           </p>
-          <h2 className="mt-3 text-3xl font-semibold text-[color:var(--color-foreground)]">
+          <h2 className="mt-2 text-2xl font-semibold text-[color:var(--color-foreground)]">
             Nothing is due right now.
           </h2>
-          <p className="mt-4 max-w-xl text-sm leading-7 text-[color:var(--color-muted)]">
+          <p className="mt-3 max-w-xl text-sm leading-6 text-[color:var(--color-muted)]">
             That is the right kind of empty state. Search a few more words or
             wait for cards to come due again.
           </p>
@@ -260,12 +260,12 @@ export function ReviewStudio() {
           ) : null}
         </div>
 
-        <div className="soft-panel rounded-[32px] px-6 py-6">
+        <div className="soft-panel rounded-[24px] px-5 py-5">
           <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
             Session Stats
           </p>
-          <p className="mt-3 text-4xl font-semibold">{reviewsToday}</p>
-          <p className="mt-2 text-sm leading-7 text-[color:var(--color-muted)]">
+          <p className="mt-2 text-3xl font-semibold">{reviewsToday}</p>
+          <p className="mt-1 text-sm leading-6 text-[color:var(--color-muted)]">
             Reviews logged today for the active account.
           </p>
         </div>
@@ -274,36 +274,36 @@ export function ReviewStudio() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      <div className="soft-panel rounded-[32px] px-6 py-6 sm:px-8">
-        <div className="flex items-center justify-between gap-3">
-          <div>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="soft-panel rounded-[24px] px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
               {current ? getCardTypeLabel(current.reviewCard.cardType) : "Current Card"}
             </p>
-            <p className="mt-2 text-sm text-[color:var(--color-muted)]">
+            <span className="rounded-full bg-[rgba(17,32,57,0.06)] px-2.5 py-1 text-xs font-medium text-[color:var(--color-muted)]">
               Due {formatDueLabel(current.reviewState.dueAt)}
-            </p>
-            <span className="mt-3 inline-flex rounded-full bg-[rgba(47,139,115,0.1)] px-3 py-1 text-xs font-medium text-[color:var(--color-accent-secondary)]">
+            </span>
+            <span className="rounded-full bg-[rgba(47,139,115,0.1)] px-2.5 py-1 text-xs font-medium text-[color:var(--color-accent-secondary)]">
               {remainingReviewCount} left
             </span>
           </div>
-          <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
+          <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-2.5 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
             previous interval {formatReviewInterval(current.reviewState.intervalDays)}
           </span>
         </div>
 
-        <div className="mt-8 rounded-[28px] border border-[color:var(--color-border)] bg-white px-6 py-8">
-          <p className="text-xs font-medium uppercase tracking-[0.3em] text-[color:var(--color-accent)]">
+        <div className="mt-4 rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-5 sm:px-5">
+          <p className="text-[0.68rem] font-medium uppercase tracking-[0.26em] text-[color:var(--color-accent)]">
             Front
           </p>
           {isProductionCard ? (
-            <div className="mt-4 space-y-5">
+            <div className="mt-3 space-y-3">
               <DefinitionLabelList labels={current.definitionLabels} />
-              <p className="text-lg leading-8 text-[color:var(--color-foreground)]">
+              <p className="text-base leading-7 text-[color:var(--color-foreground)]">
                 {current.definition}
               </p>
-              <p className="rounded-[22px] bg-[rgba(47,139,115,0.08)] px-4 py-4 text-sm italic leading-7 text-[color:var(--color-foreground)]">
+              <p className="rounded-[18px] bg-[rgba(47,139,115,0.08)] px-4 py-3 text-sm italic leading-6 text-[color:var(--color-foreground)]">
                 &quot;{clozeSentence}&quot;
               </p>
               <label className="block">
@@ -333,27 +333,27 @@ export function ReviewStudio() {
                   autoCapitalize="none"
                   autoComplete="off"
                   autoCorrect="off"
-                  className="mt-2 h-12 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-base text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)] disabled:opacity-70"
+                  className="mt-2 h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 text-base text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)] disabled:opacity-70"
                 />
               </label>
             </div>
           ) : (
             <>
-              <h2 className="mt-4 text-4xl font-semibold text-[color:var(--color-foreground)]">
+              <h2 className="mt-3 text-3xl font-semibold text-[color:var(--color-foreground)]">
                 {current.canonicalTerm}
               </h2>
-              <p className="mt-2 text-sm text-[color:var(--color-muted)]">
+              <p className="mt-1 text-sm text-[color:var(--color-muted)]">
                 {current.partOfSpeech}
               </p>
-              <PronunciationList pronunciations={current.pronunciations} />
+              <PronunciationList compact pronunciations={current.pronunciations} />
             </>
           )}
 
           {revealed ? (
-            <div className="mt-8 space-y-4 border-t border-[color:var(--color-border)] pt-6">
+            <div className="mt-5 space-y-3 border-t border-[color:var(--color-border)] pt-4">
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
+                  <p className="text-[0.68rem] font-medium uppercase tracking-[0.26em] text-[color:var(--color-accent)]">
                     Back
                   </p>
                   {editingBackCardId !== current.id ? (
@@ -369,7 +369,7 @@ export function ReviewStudio() {
                         );
                         setEditExampleSentence(current.exampleSentence);
                       }}
-                      className="rounded-full border border-[color:var(--color-border)] px-3 py-1.5 text-xs font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
+                      className="rounded-full border border-[color:var(--color-border)] px-2.5 py-1 text-xs font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
                     >
                       Edit
                     </button>
@@ -378,7 +378,7 @@ export function ReviewStudio() {
 
                 {editingBackCardId === current.id ? (
                   <form
-                    className="mt-4 space-y-4"
+                    className="mt-3 space-y-3"
                     onSubmit={async (event) => {
                       event.preventDefault();
                       setBackEditMessage(null);
@@ -415,7 +415,7 @@ export function ReviewStudio() {
                           setEditDefinitionLabels(event.target.value)
                         }
                         placeholder="formal, literary"
-                        className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        className="mt-1.5 h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
                       />
                     </label>
                     <label className="block">
@@ -426,7 +426,7 @@ export function ReviewStudio() {
                         required
                         value={editDefinition}
                         onChange={(event) => setEditDefinition(event.target.value)}
-                        className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        className="mt-1.5 min-h-20 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm leading-6 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
                       />
                     </label>
                     <label className="block">
@@ -438,7 +438,7 @@ export function ReviewStudio() {
                         onChange={(event) =>
                           setEditExampleSentence(event.target.value)
                         }
-                        className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm italic leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        className="mt-1.5 min-h-20 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm italic leading-6 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
                       />
                     </label>
                     <label className="block">
@@ -451,14 +451,14 @@ export function ReviewStudio() {
                           setEditClozeSentence(event.target.value)
                         }
                         placeholder="Use _____ for the hidden word."
-                        className="mt-2 min-h-24 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm italic leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        className="mt-1.5 min-h-20 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm italic leading-6 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
                       />
                     </label>
                     <div className="flex flex-wrap gap-3">
                       <button
                         type="submit"
                         disabled={isSavingBack}
-                        className="rounded-full bg-[color:var(--color-foreground)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-full bg-[color:var(--color-foreground)] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isSavingBack ? "Saving..." : "Save"}
                       </button>
@@ -469,7 +469,7 @@ export function ReviewStudio() {
                           setBackEditMessage(null);
                           setEditingBackCardId(null);
                         }}
-                        className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-full border border-[color:var(--color-border)] px-3 py-1.5 text-sm font-medium text-[color:var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Cancel
                       </button>
@@ -479,7 +479,7 @@ export function ReviewStudio() {
                   isProductionCard ? (
                     <div className="space-y-3">
                       {typedAnswer.trim() ? (
-                        <p className="rounded-[18px] bg-[rgba(17,32,57,0.06)] px-4 py-3 text-sm text-[color:var(--color-muted)]">
+                        <p className="rounded-[16px] bg-[rgba(17,32,57,0.06)] px-3 py-2 text-sm text-[color:var(--color-muted)]">
                           Your answer:{" "}
                           <span className="font-medium text-[color:var(--color-foreground)]">
                             {typedAnswer}
@@ -489,31 +489,31 @@ export function ReviewStudio() {
                       <p className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
                         Correct spelling
                       </p>
-                      <h2 className="text-4xl font-semibold text-[color:var(--color-foreground)]">
+                      <h2 className="text-3xl font-semibold text-[color:var(--color-foreground)]">
                         {current.canonicalTerm}
                       </h2>
                       <p className="text-sm text-[color:var(--color-muted)]">
                         {current.partOfSpeech}
                       </p>
-                      <PronunciationList pronunciations={current.pronunciations} />
+                      <PronunciationList compact pronunciations={current.pronunciations} />
                     </div>
                   ) : (
                     <>
                       <DefinitionLabelList labels={current.definitionLabels} />
-                      <p className="mt-3 text-base leading-7 text-[color:var(--color-foreground)]">
+                      <p className="mt-2 text-base leading-6 text-[color:var(--color-foreground)]">
                         {current.definition}
                       </p>
                     </>
                   )
                 )}
                 {backEditMessage ? (
-                  <p className="mt-3 rounded-[18px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-4 py-3 text-sm text-[color:var(--color-foreground)]">
+                  <p className="mt-3 rounded-[16px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-3 py-2 text-sm text-[color:var(--color-foreground)]">
                     {backEditMessage}
                   </p>
                 ) : null}
               </div>
               {editingBackCardId !== current.id && !isProductionCard ? (
-                <p className="rounded-[22px] bg-[rgba(47,139,115,0.08)] px-4 py-4 text-sm italic leading-7 text-[color:var(--color-foreground)]">
+                <p className="rounded-[18px] bg-[rgba(47,139,115,0.08)] px-4 py-3 text-sm italic leading-6 text-[color:var(--color-foreground)]">
                   “{current.exampleSentence}”
                 </p>
               ) : null}
@@ -523,7 +523,7 @@ export function ReviewStudio() {
 
         {sessionFeedback ? (
           <div
-            className={`mt-4 rounded-[22px] border px-4 py-4 text-sm font-medium leading-7 ${
+            className={`mt-3 rounded-[18px] border px-3 py-2 text-sm font-medium leading-6 ${
               sessionFeedback.tone === "success"
                 ? "border-[color:var(--color-accent-secondary)] bg-[rgba(47,139,115,0.08)] text-[color:var(--color-accent-secondary)]"
                 : "border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] text-[color:var(--color-danger)]"
@@ -533,7 +533,7 @@ export function ReviewStudio() {
           </div>
         ) : null}
 
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
             aria-pressed={revealed}
@@ -555,7 +555,7 @@ export function ReviewStudio() {
               );
             }}
             disabled={isSubmitting || isSavingBack}
-            className="rounded-full bg-[color:var(--color-foreground)] px-5 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
+            className="rounded-full bg-[color:var(--color-foreground)] px-4 py-2 text-sm font-medium text-white transition-transform hover:-translate-y-0.5"
           >
             {isSubmitting
               ? "Saving..."
@@ -606,7 +606,7 @@ export function ReviewStudio() {
                   setIsSubmitting(false);
                 }
               }}
-              className={`flex min-w-24 flex-col items-center rounded-full border px-5 py-2.5 text-sm font-medium leading-tight transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${ratingTone[rating]}`}
+              className={`flex min-w-20 flex-col items-center rounded-full border px-4 py-2 text-sm font-medium leading-tight transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${ratingTone[rating]}`}
             >
               <span>{RATING_LABELS[rating]}</span>
               <span className="mt-1 text-xs opacity-75">{nextDueLabel}</span>
@@ -617,90 +617,74 @@ export function ReviewStudio() {
           ))}
         </div>
         {errorMessage ? (
-          <div className="mt-4 rounded-[22px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-4 py-4 text-sm leading-7 text-[color:var(--color-foreground)]">
+          <div className="mt-3 rounded-[18px] border border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] px-3 py-2 text-sm leading-6 text-[color:var(--color-foreground)]">
             {errorMessage}
           </div>
         ) : null}
       </div>
 
-      <div className="grid gap-6">
-        <div className="soft-panel rounded-[32px] px-6 py-6">
-          <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
-            Queue
-          </p>
-          <div className="mt-5 rounded-[24px] border border-[color:var(--color-border)] bg-white px-5 py-5">
-            <p className="text-3xl font-semibold text-[color:var(--color-foreground)]">
-              {upcomingReviewCount}
+      <div className="grid content-start gap-4">
+        <div className="soft-panel rounded-[24px] px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
+              Queue
             </p>
-            <p className="mt-2 text-sm leading-7 text-[color:var(--color-muted)]">
-              {upcomingReviewCount === 1
-                ? "card after this one. Answers stay hidden to avoid preview hints."
-                : "cards after this one. Answers stay hidden to avoid preview hints."}
-            </p>
+            <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
+              {upcomingReviewCount} next
+            </span>
           </div>
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             {upcomingTypeSummaries.length > 0 ? (
               upcomingTypeSummaries.map(({ cardType, count }) => (
-                <div
+                <span
                   key={cardType}
-                  className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4"
+                  title={getCardTypeDescription(cardType)}
+                  className="rounded-full border border-[color:var(--color-border)] bg-white px-3 py-1.5 text-xs font-medium text-[color:var(--color-foreground)]"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-[color:var(--color-foreground)]">
-                        {getCardTypeLabel(cardType)}
-                      </p>
-                      <p className="mt-1 text-sm leading-6 text-[color:var(--color-muted)]">
-                        {getCardTypeDescription(cardType)}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">
-                      {count}
-                    </span>
-                  </div>
-                </div>
+                  {count} {getCardTypeLabel(cardType)}
+                </span>
               ))
             ) : (
-              <p className="rounded-[20px] border border-dashed border-[color:var(--color-border)] px-4 py-5 text-sm text-[color:var(--color-muted)]">
-                This is the last due card in the queue.
+              <p className="rounded-[18px] border border-dashed border-[color:var(--color-border)] px-3 py-3 text-sm text-[color:var(--color-muted)]">
+                Last due card.
               </p>
             )}
           </div>
         </div>
 
-        <div className="soft-panel rounded-[32px] px-6 py-6">
-          <p className="text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
-            Scheduler State
-          </p>
-          <dl className="mt-5 grid gap-4 text-sm">
-            <div className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4">
+        <details className="soft-panel rounded-[24px] px-4 py-4">
+          <summary className="cursor-pointer text-xs font-medium uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
+            Scheduler
+          </summary>
+          <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-[16px] border border-[color:var(--color-border)] bg-white px-3 py-3">
               <dt className="text-[color:var(--color-muted)]">Repetitions</dt>
-              <dd className="mt-1 text-xl font-semibold text-[color:var(--color-foreground)]">
+              <dd className="mt-1 text-lg font-semibold text-[color:var(--color-foreground)]">
                 {current.reviewState.repetitionCount}
               </dd>
             </div>
-            <div className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4">
+            <div className="rounded-[16px] border border-[color:var(--color-border)] bg-white px-3 py-3">
               <dt className="text-[color:var(--color-muted)]">Difficulty</dt>
-              <dd className="mt-1 text-xl font-semibold text-[color:var(--color-foreground)]">
+              <dd className="mt-1 text-lg font-semibold text-[color:var(--color-foreground)]">
                 {current.reviewState.difficulty.toFixed(2)}
               </dd>
             </div>
-            <div className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4">
+            <div className="rounded-[16px] border border-[color:var(--color-border)] bg-white px-3 py-3">
               <dt className="text-[color:var(--color-muted)]">Retrievability</dt>
-              <dd className="mt-1 text-xl font-semibold text-[color:var(--color-foreground)]">
+              <dd className="mt-1 text-lg font-semibold text-[color:var(--color-foreground)]">
                 {retrievability === null
                   ? "new"
                   : `${Math.round(retrievability * 100)}%`}
               </dd>
             </div>
-            <div className="rounded-[20px] border border-[color:var(--color-border)] bg-white px-4 py-4">
+            <div className="rounded-[16px] border border-[color:var(--color-border)] bg-white px-3 py-3">
               <dt className="text-[color:var(--color-muted)]">Lapses</dt>
-              <dd className="mt-1 text-xl font-semibold text-[color:var(--color-foreground)]">
+              <dd className="mt-1 text-lg font-semibold text-[color:var(--color-foreground)]">
                 {current.reviewState.lapseCount}
               </dd>
             </div>
           </dl>
-        </div>
+        </details>
       </div>
     </div>
   );

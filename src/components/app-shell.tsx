@@ -14,45 +14,56 @@ export function AppShell({
   remotePersistenceEnabled: boolean;
   children: React.ReactNode;
 }) {
+  const syncLabel = remotePersistenceEnabled
+    ? "Synced"
+    : authConfigured
+      ? "Local"
+      : "Setup needed";
+  const syncClass = remotePersistenceEnabled
+    ? "bg-[color:var(--color-accent-secondary)]"
+    : authConfigured
+      ? "bg-[color:var(--color-warning)]"
+      : "bg-[color:var(--color-danger)]";
+
   return (
     <div className="min-h-screen">
       <SearchShortcut />
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
-        <header className="soft-panel dotted-grid rounded-[32px] px-5 py-5 sm:px-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-3">
-              <Link href="/" className="inline-flex items-center gap-3">
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[color:var(--color-foreground)] text-lg font-semibold text-white">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-3 py-3 sm:px-4 lg:px-5">
+        <header className="soft-panel dotted-grid rounded-[22px] px-3 py-3 sm:px-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center justify-between gap-3">
+              <Link href="/" className="inline-flex items-center gap-2.5">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--color-foreground)] text-base font-semibold text-white">
                   V
                 </span>
-                <div>
-                  <p className="text-lg font-semibold text-[color:var(--color-foreground)]">
-                    VocabMinder
-                  </p>
-                  <p className="text-sm text-[color:var(--color-muted)]">
-                    Look up. Keep. Review.
-                  </p>
-                </div>
+                <p className="text-base font-semibold text-[color:var(--color-foreground)]">
+                  VocabMinder
+                </p>
               </Link>
+              <span
+                title={syncLabel}
+                aria-label={syncLabel}
+                className={`inline-flex h-2.5 w-2.5 rounded-full ${syncClass}`}
+              />
             </div>
 
-            <div className="flex flex-col items-start gap-3 lg:items-end">
-              <nav className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+              <nav className="flex flex-wrap gap-1.5">
                 <NavLink href="/">Dashboard</NavLink>
                 <NavLink href="/review">Review</NavLink>
                 <NavLink href="/vocab">Vocabulary</NavLink>
                 <NavLink href="/settings">Settings</NavLink>
               </nav>
-              <div className="flex flex-wrap items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 {authUserEmail ? (
                   <>
-                    <span className="rounded-full border border-[color:var(--color-border)] bg-white px-4 py-2 text-[color:var(--color-foreground)]">
+                    <span className="max-w-56 truncate rounded-full border border-[color:var(--color-border)] bg-white px-3 py-1.5 text-[color:var(--color-foreground)]">
                       {authUserEmail}
                     </span>
                     <form action={signOutAction}>
                       <button
                         type="submit"
-                        className="rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-strong)] px-4 py-2 font-medium text-[color:var(--color-foreground)] transition-colors hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
+                        className="rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-strong)] px-3 py-1.5 font-medium text-[color:var(--color-foreground)] transition-colors hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
                       >
                         Sign out
                       </button>
@@ -61,12 +72,12 @@ export function AppShell({
                 ) : authConfigured ? (
                   <Link
                     href="/login"
-                    className="rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-strong)] px-4 py-2 font-medium text-[color:var(--color-foreground)] transition-colors hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
+                    className="rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-strong)] px-3 py-1.5 font-medium text-[color:var(--color-foreground)] transition-colors hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
                   >
                     Sign in
                   </Link>
                 ) : (
-                  <span className="rounded-full border border-[color:var(--color-warning)] bg-[rgba(179,122,42,0.1)] px-4 py-2 text-[color:var(--color-foreground)]">
+                  <span className="rounded-full border border-[color:var(--color-warning)] bg-[rgba(179,122,42,0.1)] px-3 py-1.5 text-[color:var(--color-foreground)]">
                     Supabase env missing
                   </span>
                 )}
@@ -75,15 +86,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 py-8">{children}</main>
-
-        <footer className="mt-4 border-t border-[color:var(--color-border)] px-1 pt-4 text-sm text-[color:var(--color-muted)]">
-          {remotePersistenceEnabled
-            ? "Signed-in mode syncs vocabulary, review state, and review history through Supabase."
-            : authConfigured
-              ? "Guest mode still runs locally. Sign in to sync vocabulary and review progress through Supabase."
-              : "Supabase env is still missing, so the app stays in local preview mode until the hosted project variables are configured."}
-        </footer>
+        <main className="flex-1 py-4">{children}</main>
       </div>
     </div>
   );

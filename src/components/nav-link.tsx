@@ -16,7 +16,7 @@ export function NavLink({
   return (
     <Link
       href={href}
-      className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
         isActive
           ? "border-[color:var(--color-foreground)] bg-[color:var(--color-foreground)] !text-white hover:!text-white visited:!text-white"
           : "border-[color:var(--color-border)] bg-[color:var(--color-surface-strong)] text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
