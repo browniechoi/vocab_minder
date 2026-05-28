@@ -185,8 +185,9 @@ export function ReviewStudio() {
 
     const normalizedAnswer = normalizeTypedAnswer(typedAnswer);
     if (!normalizedAnswer) {
+      setRevealedCardId(currentCardId);
       setSessionFeedback({
-        message: "Type the word before checking.",
+        message: "Answer shown. Self-grade this card.",
         tone: "error",
       });
       return;
