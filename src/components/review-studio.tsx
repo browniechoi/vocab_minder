@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
 import { DefinitionLabelList } from "@/components/definition-label-list";
 import { PronunciationList } from "@/components/pronunciation-list";
@@ -84,6 +84,7 @@ function removeTypedAnswer(
 
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday, updateVocabBack } = useAppState();
+  const productionAnswerInputRef = useRef<HTMLInputElement>(null);
   const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
   const [backEditMessage, setBackEditMessage] = useState<string | null>(null);
   const [editingBackCardId, setEditingBackCardId] = useState<string | null>(null);
@@ -160,6 +161,14 @@ export function ReviewStudio() {
   const retrievability = current
     ? getReviewRetrievability(current.reviewState)
     : null;
+
+  useEffect(() => {
+    if (!isProductionCard || revealed || isSubmitting || isSavingBack) {
+      return;
+    }
+
+    productionAnswerInputRef.current?.focus();
+  }, [currentCardId, isProductionCard, isSavingBack, isSubmitting, revealed]);
 
   async function checkProductionAnswer() {
     if (!current || !currentCardId || isSubmitting || isSavingBack) {
@@ -299,6 +308,7 @@ export function ReviewStudio() {
                   Type the word
                 </span>
                 <input
+                  ref={productionAnswerInputRef}
                   value={typedAnswer}
                   onChange={(event) => {
                     const nextAnswer = event.target.value;
