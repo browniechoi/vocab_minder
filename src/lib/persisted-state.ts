@@ -18,7 +18,7 @@ import {
   splitInlineDefinitionLabels,
 } from "@/lib/definition-labels";
 import { PLAN_LIMITS } from "@/lib/plan";
-import { createInitialReviewState } from "@/lib/review";
+import { normalizeReviewState } from "@/lib/review";
 
 export type ProfileRow = {
   plan_tier: PlanTier;
@@ -161,7 +161,7 @@ export function attachReviewState(
 ): VocabItem {
   return {
     ...vocab,
-    reviewState: reviewState ?? createInitialReviewState(new Date(vocab.createdAt)),
+    reviewState: normalizeReviewState(reviewState, new Date(vocab.createdAt)),
   };
 }
 
@@ -181,7 +181,7 @@ export function mergePersistedItemsWithReviewCache(
 }
 
 export function mapReviewStateRow(row: ReviewStateRow): ReviewState {
-  return {
+  return normalizeReviewState({
     dueAt: row.due_at,
     intervalDays: Number(row.interval_days),
     easeFactor: Number(row.ease_factor),
@@ -193,7 +193,7 @@ export function mapReviewStateRow(row: ReviewStateRow): ReviewState {
     fsrsState: row.fsrs_state ?? "New",
     learningSteps: row.learning_steps ?? 0,
     desiredRetention: Number(row.desired_retention ?? 0.92),
-  };
+  });
 }
 
 export function mapReviewCardRow(
@@ -205,7 +205,7 @@ export function mapReviewCardRow(
     vocabItemId: row.vocab_item_id,
     cardType: row.card_type,
     isActive: row.is_active,
-    reviewState,
+    reviewState: normalizeReviewState(reviewState),
   };
 }
 

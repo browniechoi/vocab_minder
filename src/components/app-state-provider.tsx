@@ -31,6 +31,7 @@ import {
   applyReview,
   isDue,
   NEW_WORD_DUE_CARD_LIMIT,
+  normalizeReviewState,
   shouldUnlockProduction,
 } from "@/lib/review";
 
@@ -132,6 +133,24 @@ function countReviewsToday(state: AppState) {
   ).length;
 }
 
+function normalizeClientState(state: AppState): AppState {
+  return {
+    ...state,
+    items: state.items.map((item) => ({
+      ...item,
+      reviewState: normalizeReviewState(
+        item.reviewState,
+        new Date(item.createdAt),
+      ),
+    })),
+    reviewCards: (state.reviewCards ?? []).map((card) => ({
+      ...card,
+      reviewState: normalizeReviewState(card.reviewState),
+    })),
+    reviewEvents: state.reviewEvents ?? [],
+  };
+}
+
 function readFullPreviewState(storageKey: string) {
   try {
     const stored = window.localStorage?.getItem(storageKey);
@@ -144,10 +163,12 @@ function readFullPreviewState(storageKey: string) {
       return null;
     }
 
-    return ensureReviewCards({
-      ...parsed,
-      reviewCards: parsed.reviewCards ?? [],
-    });
+    return ensureReviewCards(
+      normalizeClientState({
+        ...parsed,
+        reviewCards: parsed.reviewCards ?? [],
+      }),
+    );
   } catch {
     return null;
   }
@@ -192,16 +213,28 @@ function getRecognitionCard(item: VocabItem, reviewCards: ReviewCard[]) {
 }
 
 function withPrimaryReviewStates(state: AppState) {
-  return state.items.map((item) => ({
-    ...item,
-    reviewState:
-      getRecognitionCard(item, state.reviewCards)?.reviewState ??
+  return state.items.map((item) => {
+    const fallbackReviewState = normalizeReviewState(
       item.reviewState,
-  }));
+      new Date(item.createdAt),
+    );
+
+    return {
+      ...item,
+      reviewState: normalizeReviewState(
+        getRecognitionCard(item, state.reviewCards)?.reviewState ??
+          fallbackReviewState,
+        new Date(item.createdAt),
+      ),
+    };
+  });
 }
 
 function ensureReviewCards(state: AppState): AppState {
-  const existingCards = state.reviewCards ?? [];
+  const existingCards = (state.reviewCards ?? []).map((card) => ({
+    ...card,
+    reviewState: normalizeReviewState(card.reviewState),
+  }));
   const nextCards = [...existingCards];
 
   for (const item of state.items) {
@@ -235,6 +268,10 @@ function buildDueItems(items: VocabItem[], reviewCards: ReviewCard[]) {
   const seenVocabIds = new Set<string>();
 
   return reviewCards
+    .map((card) => ({
+      ...card,
+      reviewState: normalizeReviewState(card.reviewState),
+    }))
     .filter((card) => card.isActive && isDue(card.reviewState))
     .sort(
       (left, right) =>
@@ -362,13 +399,13 @@ export function AppStateProvider({
         }
 
         canPersistRef.current = true;
-        setState({
+        setState(normalizeClientState({
           planTier: payload.profile.planTier,
           activeLimit: payload.profile.activeLimit,
           items: payload.items,
           reviewCards: payload.reviewCards,
           reviewEvents: payload.reviewEvents,
-        });
+        }));
       } catch {
         if (!cancelled) {
           canPersistRef.current = true;

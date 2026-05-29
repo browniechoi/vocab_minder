@@ -69,8 +69,99 @@ export function createInitialReviewState(now = new Date()): ReviewState {
   };
 }
 
+function coerceFiniteNumber(value: unknown, fallback: number) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function coerceIsoDate(value: unknown, fallback: string) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  return Number.isNaN(new Date(value).getTime()) ? fallback : value;
+}
+
+function coerceIsoDateOrNull(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  return Number.isNaN(new Date(value).getTime()) ? null : value;
+}
+
+function coerceMemoryState(value: unknown, fallback: ReviewMemoryState) {
+  return value === "New" ||
+    value === "Learning" ||
+    value === "Review" ||
+    value === "Relearning"
+    ? value
+    : fallback;
+}
+
+export function normalizeReviewState(
+  reviewState?: Partial<ReviewState> | null,
+  fallbackDate = new Date(),
+): ReviewState {
+  const fallback = createInitialReviewState(fallbackDate);
+  if (!reviewState) {
+    return fallback;
+  }
+
+  const intervalDays = coerceFiniteNumber(
+    reviewState.intervalDays,
+    fallback.intervalDays,
+  );
+  const easeFactor = coerceFiniteNumber(
+    reviewState.easeFactor,
+    fallback.easeFactor,
+  );
+  const repetitionCount = Math.max(
+    0,
+    Math.round(
+      coerceFiniteNumber(reviewState.repetitionCount, fallback.repetitionCount),
+    ),
+  );
+
+  return {
+    dueAt: coerceIsoDate(reviewState.dueAt, fallback.dueAt),
+    intervalDays,
+    easeFactor,
+    repetitionCount,
+    lapseCount: Math.max(
+      0,
+      Math.round(coerceFiniteNumber(reviewState.lapseCount, fallback.lapseCount)),
+    ),
+    lastReviewedAt: coerceIsoDateOrNull(reviewState.lastReviewedAt),
+    stabilityDays: coerceFiniteNumber(
+      reviewState.stabilityDays,
+      Math.max(intervalDays, fallback.stabilityDays),
+    ),
+    difficulty: coerceFiniteNumber(
+      reviewState.difficulty,
+      coerceFiniteNumber(reviewState.easeFactor, fallback.difficulty),
+    ),
+    fsrsState: coerceMemoryState(
+      reviewState.fsrsState,
+      repetitionCount > 0 ? "Review" : fallback.fsrsState,
+    ),
+    learningSteps: Math.max(
+      0,
+      Math.round(
+        coerceFiniteNumber(reviewState.learningSteps, fallback.learningSteps),
+      ),
+    ),
+    desiredRetention: coerceFiniteNumber(
+      reviewState.desiredRetention,
+      fallback.desiredRetention,
+    ),
+  };
+}
+
 export function isDue(reviewState: ReviewState, now = new Date()) {
-  return new Date(reviewState.dueAt).getTime() <= now.getTime();
+  return (
+    new Date(normalizeReviewState(reviewState).dueAt).getTime() <= now.getTime()
+  );
 }
 
 export function applyReview(
@@ -108,32 +199,25 @@ export function shouldUnlockProduction(reviewState: ReviewState) {
 }
 
 function toFsrsCard(reviewState: ReviewState): FsrsCard {
-  const emptyCard = createEmptyCard(new Date(reviewState.dueAt));
-  const intervalDays = Number.isFinite(reviewState.intervalDays)
-    ? reviewState.intervalDays
-    : 0;
-  const stabilityDays = Number.isFinite(reviewState.stabilityDays)
-    ? reviewState.stabilityDays
-    : Math.max(intervalDays, 0);
-  const difficulty = Number.isFinite(reviewState.difficulty)
-    ? reviewState.difficulty
-    : Number.isFinite(reviewState.easeFactor)
-      ? reviewState.easeFactor
-      : 0;
+  const normalizedState = normalizeReviewState(reviewState);
+  const emptyCard = createEmptyCard(new Date(normalizedState.dueAt));
+  const intervalDays = normalizedState.intervalDays;
+  const stabilityDays = normalizedState.stabilityDays;
+  const difficulty = normalizedState.difficulty;
 
   return {
     ...emptyCard,
-    due: new Date(reviewState.dueAt),
+    due: new Date(normalizedState.dueAt),
     stability: stabilityDays,
     difficulty,
     elapsed_days: Math.max(0, Math.round(intervalDays)),
     scheduled_days: Math.max(0, Math.round(intervalDays)),
-    learning_steps: reviewState.learningSteps ?? 0,
-    reps: reviewState.repetitionCount ?? 0,
-    lapses: reviewState.lapseCount ?? 0,
-    state: memoryStateToFsrs[getMemoryState(reviewState)],
-    last_review: reviewState.lastReviewedAt
-      ? new Date(reviewState.lastReviewedAt)
+    learning_steps: normalizedState.learningSteps,
+    reps: normalizedState.repetitionCount,
+    lapses: normalizedState.lapseCount,
+    state: memoryStateToFsrs[getMemoryState(normalizedState)],
+    last_review: normalizedState.lastReviewedAt
+      ? new Date(normalizedState.lastReviewedAt)
       : undefined,
   };
 }

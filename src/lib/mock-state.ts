@@ -10,6 +10,7 @@ import { searchDictionary } from "@/lib/mock-dictionary";
 import { PLAN_LIMITS } from "@/lib/plan";
 import {
   createInitialReviewState,
+  normalizeReviewState,
   shouldUnlockProduction,
 } from "@/lib/review";
 
@@ -57,7 +58,7 @@ export function createReviewCardForItem(
     vocabItemId: item.id,
     cardType,
     isActive: item.status === "active",
-    reviewState: reviewState ?? createInitialReviewState(new Date(item.createdAt)),
+    reviewState: normalizeReviewState(reviewState, new Date(item.createdAt)),
   } satisfies ReviewCard;
 }
 
