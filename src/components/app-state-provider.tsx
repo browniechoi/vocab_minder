@@ -134,7 +134,7 @@ function countReviewsToday(state: AppState) {
 
 function readFullPreviewState(storageKey: string) {
   try {
-    const stored = window.localStorage.getItem(storageKey);
+    const stored = window.localStorage?.getItem(storageKey);
     if (!stored) {
       return null;
     }
@@ -150,6 +150,14 @@ function readFullPreviewState(storageKey: string) {
     });
   } catch {
     return null;
+  }
+}
+
+function writeFullPreviewState(storageKey: string, state: AppState) {
+  try {
+    window.localStorage?.setItem(storageKey, JSON.stringify(state));
+  } catch {
+    // Storage can be unavailable in embedded browsers or privacy-restricted contexts.
   }
 }
 
@@ -386,7 +394,7 @@ export function AppStateProvider({
       return;
     }
 
-    window.localStorage.setItem(previewStorageKey, JSON.stringify(state));
+    writeFullPreviewState(previewStorageKey, state);
   }, [previewStorageKey, remotePersistenceEnabled, state]);
 
   useEffect(() => {
