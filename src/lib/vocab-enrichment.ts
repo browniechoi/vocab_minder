@@ -1,4 +1,8 @@
 import type { DictionaryEntry } from "@/lib/app-types";
+import {
+  buildClozeSentence as buildSafeClozeSentence,
+  isSafeClozeSentence,
+} from "@/lib/cloze";
 
 type VocabEnrichment = {
   clozeSentence: string;
@@ -38,17 +42,11 @@ function clampText(value: unknown, maxLength: number) {
 }
 
 export function buildClozeSentence(entry: DictionaryEntry) {
-  if (entry.clozeSentence?.includes("_____")) {
-    return entry.clozeSentence;
-  }
-
-  const escapedTerm = entry.canonicalTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const termPattern = new RegExp(`\\b${escapedTerm}(?:ed|ing|s)?\\b`, "i");
-  if (termPattern.test(entry.exampleSentence)) {
-    return entry.exampleSentence.replace(termPattern, "_____");
-  }
-
-  return `A sentence using "${entry.canonicalTerm}" belongs here: _____.`;
+  return buildSafeClozeSentence({
+    clozeSentence: entry.clozeSentence,
+    exampleSentence: entry.exampleSentence,
+    term: entry.canonicalTerm,
+  });
 }
 
 function extractOutputText(payload: unknown) {
@@ -91,7 +89,7 @@ function applySafeEnrichment(
     definition: definition || entry.definition,
     exampleSentence: exampleSentence || entry.exampleSentence,
     clozeSentence:
-      clozeSentence && clozeSentence.includes("_____")
+      clozeSentence && isSafeClozeSentence(clozeSentence, entry.canonicalTerm)
         ? clozeSentence
         : buildClozeSentence({
             ...entry,
@@ -125,7 +123,7 @@ export async function enrichDictionaryEntry(entry: DictionaryEntry) {
           {
             role: "system",
             content:
-              "You improve English vocabulary flashcards. Return JSON only. Stay faithful to the dictionary meaning. Do not invent specialized meanings. Keep examples realistic, concrete, and useful for adult English learners.",
+              "You improve English vocabulary flashcards. Return JSON only. Stay faithful to the dictionary meaning. Do not invent specialized meanings. Keep examples realistic, concrete, and useful for adult English learners. The cloze sentence must contain exactly one _____ and must not contain the target word or an inflected form of it.",
           },
           {
             role: "user",

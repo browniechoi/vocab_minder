@@ -1,4 +1,5 @@
 import type { DictionaryEntry, Pronunciation } from "@/lib/app-types";
+import { stripHeadwordSuffix } from "@/lib/cloze";
 import {
   parseDefinitionLabelText,
   splitInlineDefinitionLabels,
@@ -208,12 +209,12 @@ export function toDictionaryEntry(payload: unknown): DictionaryEntry | null {
   }
 
   const appShortDef = firstEntry.meta?.["app-shortdef"];
-  const canonicalTerm = cleanMerriamText(
+  const canonicalTerm = stripHeadwordSuffix(cleanMerriamText(
     appShortDef?.hw ??
       firstEntry.hwi?.hw ??
       firstEntry.meta?.id?.split(":")[0] ??
       "",
-  );
+  ));
   const extractedDefinition =
     extractDefinition(firstEntry) ??
     extractFallbackDefinition(appShortDef?.def?.[0] ?? firstEntry.shortdef?.[0]);

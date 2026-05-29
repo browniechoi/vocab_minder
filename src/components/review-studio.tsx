@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
 import { DefinitionLabelList } from "@/components/definition-label-list";
 import { PronunciationList } from "@/components/pronunciation-list";
+import { buildClozeSentence } from "@/lib/cloze";
 import { parseDefinitionLabelText } from "@/lib/definition-labels";
 import type { ReviewRating } from "@/lib/app-types";
 import {
@@ -48,20 +49,6 @@ function getCardTypeDescription(cardType: string) {
     return "Hear audio, then type the word.";
   }
   return "Recall the meaning from the word.";
-}
-
-function getClozeSentence(term: string, exampleSentence: string, clozeSentence?: string) {
-  if (clozeSentence) {
-    return clozeSentence;
-  }
-
-  const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const termPattern = new RegExp(`\\b${escapedTerm}(?:ed|ing|s)?\\b`, "i");
-  if (termPattern.test(exampleSentence)) {
-    return exampleSentence.replace(termPattern, "_____");
-  }
-
-  return exampleSentence;
 }
 
 function normalizeTypedAnswer(value: string) {
@@ -164,11 +151,11 @@ export function ReviewStudio() {
     : [];
   const isProductionCard = current?.reviewCard.cardType === "production";
   const clozeSentence = current
-    ? getClozeSentence(
-        current.canonicalTerm,
-        current.exampleSentence,
-        current.clozeSentence,
-      )
+    ? buildClozeSentence({
+        clozeSentence: current.clozeSentence,
+        exampleSentence: current.exampleSentence,
+        term: current.canonicalTerm,
+      })
     : "";
   const retrievability = current
     ? getReviewRetrievability(current.reviewState)
