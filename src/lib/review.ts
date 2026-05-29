@@ -13,6 +13,7 @@ import type {
 } from "@/lib/app-types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const TEN_MINUTES_IN_DAYS = 10 / (24 * 60);
 export const DESIRED_RETENTION = 0.92;
 export const NEW_WORD_DUE_CARD_LIMIT = 40;
 
@@ -74,6 +75,13 @@ function coerceFiniteNumber(value: unknown, fallback: number) {
   return Number.isFinite(numberValue) ? numberValue : fallback;
 }
 
+function coercePositiveNumber(value: unknown, fallback: number) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0
+    ? numberValue
+    : fallback;
+}
+
 function coerceIsoDate(value: unknown, fallback: string) {
   if (typeof value !== "string") {
     return fallback;
@@ -122,6 +130,35 @@ export function normalizeReviewState(
       coerceFiniteNumber(reviewState.repetitionCount, fallback.repetitionCount),
     ),
   );
+  const fsrsState = coerceMemoryState(
+    reviewState.fsrsState,
+    repetitionCount > 0 ? "Review" : fallback.fsrsState,
+  );
+  const rawStabilityDays = coerceFiniteNumber(
+    reviewState.stabilityDays,
+    fallback.stabilityDays,
+  );
+  const rawDifficulty = coerceFiniteNumber(
+    reviewState.difficulty,
+    coerceFiniteNumber(reviewState.easeFactor, fallback.difficulty),
+  );
+  const stabilityDays =
+    fsrsState === "New"
+      ? Math.max(0, rawStabilityDays)
+      : coercePositiveNumber(
+          rawStabilityDays,
+          Math.max(intervalDays, TEN_MINUTES_IN_DAYS),
+        );
+  const difficulty =
+    fsrsState === "New"
+      ? Math.max(0, rawDifficulty)
+      : Math.min(
+          10,
+          Math.max(
+            1,
+            coercePositiveNumber(rawDifficulty, coercePositiveNumber(easeFactor, 5)),
+          ),
+        );
 
   return {
     dueAt: coerceIsoDate(reviewState.dueAt, fallback.dueAt),
@@ -133,18 +170,9 @@ export function normalizeReviewState(
       Math.round(coerceFiniteNumber(reviewState.lapseCount, fallback.lapseCount)),
     ),
     lastReviewedAt: coerceIsoDateOrNull(reviewState.lastReviewedAt),
-    stabilityDays: coerceFiniteNumber(
-      reviewState.stabilityDays,
-      Math.max(intervalDays, fallback.stabilityDays),
-    ),
-    difficulty: coerceFiniteNumber(
-      reviewState.difficulty,
-      coerceFiniteNumber(reviewState.easeFactor, fallback.difficulty),
-    ),
-    fsrsState: coerceMemoryState(
-      reviewState.fsrsState,
-      repetitionCount > 0 ? "Review" : fallback.fsrsState,
-    ),
+    stabilityDays,
+    difficulty,
+    fsrsState,
     learningSteps: Math.max(
       0,
       Math.round(
