@@ -51,7 +51,7 @@ Required for all environments:
 
 Optional:
 
-- `GEMINI_VOCAB_MODEL` defaults to `gemini-3.5-flash` when unset
+- `GEMINI_VOCAB_MODEL` defaults to `gemini-3.5-flash-lite` when unset
 - `OPENAI_API_KEY` and `OPENAI_VOCAB_MODEL` are only needed when `VOCAB_AI_PROVIDER=openai`
 - `MERRIAM_API_KEY` enables Merriam-Webster pronunciation and dictionary fallback
 
@@ -146,7 +146,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<from-supabase-dashboard>
 MERRIAM_API_KEY=<your-merriam-key>
 VOCAB_AI_PROVIDER=gemini
 GEMINI_API_KEY=<your-gemini-api-key>
-GEMINI_VOCAB_MODEL=gemini-3.5-flash
+GEMINI_VOCAB_MODEL=gemini-3.5-flash-lite
 ```
 
 Then run:

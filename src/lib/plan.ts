@@ -77,7 +77,7 @@ export const ENV_CHECKLIST = [
   {
     name: "GEMINI_VOCAB_MODEL",
     purpose:
-      "Gemini model used for structured vocabulary generation. Defaults to gemini-3.5-flash.",
+      "Gemini model used for structured vocabulary generation. Defaults to gemini-3.5-flash-lite.",
   },
   {
     name: "OPENAI_API_KEY",

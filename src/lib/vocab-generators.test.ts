@@ -3,7 +3,7 @@ import test from "node:test";
 import { generateVocabEntry } from "@/lib/vocab-enrichment";
 import { getVocabGenerationTarget } from "@/lib/vocab-generators";
 
-test("selects Gemini with a stable default model", () => {
+test("selects the high-throughput Gemini model by default", () => {
   const target = getVocabGenerationTarget({
     GEMINI_API_KEY: "test-key",
     VOCAB_AI_PROVIDER: "gemini",
@@ -11,8 +11,8 @@ test("selects Gemini with a stable default model", () => {
 
   assert.deepEqual(target, {
     attemptVersion:
-      "gemini:gemini-3.5-flash:2026-07-25-v3",
-    model: "gemini-3.5-flash",
+      "gemini:gemini-3.5-flash-lite:2026-07-25-v3",
+    model: "gemini-3.5-flash-lite",
     promptVersion: "2026-07-25-v3",
     provider: "gemini",
   });
@@ -51,7 +51,10 @@ test("generates and validates a form-specific Gemini entry", async (context) => 
   });
 
   global.fetch = async (input, init) => {
-    assert.match(String(input), /gemini-3\.5-flash:generateContent$/u);
+    assert.match(
+      String(input),
+      /gemini-3\.5-flash-lite:generateContent$/u,
+    );
     assert.equal(
       new Headers(init?.headers).get("x-goog-api-key"),
       "test-key",
@@ -69,7 +72,7 @@ test("generates and validates a form-specific Gemini entry", async (context) => 
     );
     assert.equal(
       requestBody.generationConfig?.thinkingConfig?.thinkingLevel,
-      "low",
+      "minimal",
     );
 
     return Response.json({
@@ -118,5 +121,5 @@ test("generates and validates a form-specific Gemini entry", async (context) => 
     "The city offers _____ housing to qualifying residents.",
   );
   assert.equal(entry?.contentProvider, "gemini");
-  assert.equal(entry?.contentModel, "gemini-3.5-flash");
+  assert.equal(entry?.contentModel, "gemini-3.5-flash-lite");
 });

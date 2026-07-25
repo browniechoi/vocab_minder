@@ -112,7 +112,7 @@ export function getVocabGenerationTarget(
 
   const model =
     provider === "gemini"
-      ? environment.GEMINI_VOCAB_MODEL ?? "gemini-3.5-flash"
+      ? environment.GEMINI_VOCAB_MODEL ?? "gemini-3.5-flash-lite"
       : environment.OPENAI_VOCAB_MODEL ?? "gpt-4.1-mini";
   if (!/^[a-z0-9._/-]+$/iu.test(model)) {
     throw new Error(`Invalid model identifier "${model}".`);
@@ -146,7 +146,9 @@ async function generateWithGemini(
   const model = target.model.replace(/^models\//u, "");
   const thinkingConfig = model.startsWith("gemini-2.5")
     ? { thinkingBudget: 512 }
-    : { thinkingLevel: "low" };
+    : {
+        thinkingLevel: model.includes("flash-lite") ? "minimal" : "low",
+      };
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
