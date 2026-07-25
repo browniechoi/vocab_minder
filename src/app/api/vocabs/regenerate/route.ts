@@ -6,8 +6,10 @@ import {
   getVocabGenerationTarget,
 } from "@/lib/vocab-enrichment";
 
-const REGENERATION_BATCH_SIZE = 2;
-const REGENERATION_BATCH_DELAY_MS = 5_000;
+// Keep bulk maintenance below Gemini's free-tier burst limits. Normal search
+// requests are not delayed.
+const REGENERATION_BATCH_SIZE = 1;
+const REGENERATION_BATCH_DELAY_MS = 8_000;
 
 type RegenerationRow = {
   canonical_term: string;

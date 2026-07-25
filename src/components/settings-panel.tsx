@@ -29,7 +29,7 @@ export function SettingsPanel() {
     }
 
     setIsRegenerating(true);
-    setRegenerationMessage("Regenerating vocabulary in small batches...");
+    setRegenerationMessage("Regenerating vocabulary at a free-tier-safe pace...");
 
     let regenerated = 0;
     let failed = 0;
@@ -165,8 +165,8 @@ export function SettingsPanel() {
               </p>
               <p className="mt-2 text-sm leading-6 text-[color:var(--color-muted)]">
                 Regenerate form-specific definitions, examples, roles, usage,
-                collocations, lemmas, and cloze answers in free-tier-safe
-                batches. Review schedules and history are not changed.
+                collocations, lemmas, and cloze answers at a free-tier-safe
+                pace. Review schedules and history are not changed.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
