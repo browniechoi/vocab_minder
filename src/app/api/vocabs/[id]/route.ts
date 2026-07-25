@@ -26,10 +26,13 @@ export async function PATCH(
       canonicalTerm?: string;
       clozeAnswer?: string;
       clozeSentence?: string;
+      commonCollocations?: unknown;
       definition?: string;
       definitionLabels?: unknown;
       exampleSentence?: string;
+      grammaticalRole?: string;
       partOfSpeech?: string;
+      usageNote?: string;
     };
     const answerLemma = body.answerLemma?.trim();
     const canonicalTerm = body.canonicalTerm?.trim();
@@ -37,14 +40,27 @@ export async function PATCH(
     const clozeSentence = body.clozeSentence?.trim();
     const definition = body.definition?.trim() ?? "";
     const exampleSentence = body.exampleSentence?.trim() ?? "";
+    const grammaticalRole = body.grammaticalRole?.trim();
     const normalizedTerm = canonicalTerm ? normalizeQuery(canonicalTerm) : "";
     const partOfSpeech = body.partOfSpeech?.trim();
+    const usageNote = body.usageNote?.trim();
     const acceptedAnswers = Array.isArray(body.acceptedAnswers)
       ? [
           ...new Set(
             body.acceptedAnswers.flatMap((answer) =>
               typeof answer === "string" && answer.trim()
                 ? [answer.trim()]
+                : [],
+            ),
+          ),
+        ]
+      : [];
+    const commonCollocations = Array.isArray(body.commonCollocations)
+      ? [
+          ...new Set(
+            body.commonCollocations.flatMap((collocation) =>
+              typeof collocation === "string" && collocation.trim()
+                ? [collocation.trim()]
                 : [],
             ),
           ),
@@ -117,16 +133,21 @@ export async function PATCH(
               pronunciations: [],
             }
           : {}),
-        ...(answerLemma || canonicalTerm
-          ? { answer_lemma: answerLemma ?? canonicalTerm }
+        ...(answerLemma
+          ? {
+              answer_lemma: answerLemma,
+              word_family_key: answerLemma
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/gu, "-"),
+            }
           : {}),
         ...(clozeAnswer || canonicalTerm
           ? { cloze_answer: clozeAnswer ?? canonicalTerm }
           : {}),
         ...(body.acceptedAnswers !== undefined
           ? { accepted_answers: acceptedAnswers }
-          : answerLemma || canonicalTerm
-            ? { accepted_answers: [answerLemma ?? canonicalTerm] }
+          : canonicalTerm
+            ? { accepted_answers: [canonicalTerm] }
             : {}),
         definition,
         definition_labels: normalizeDefinitionLabels(body.definitionLabels),
@@ -134,6 +155,15 @@ export async function PATCH(
           ? { cloze_sentence: clozeSentence || null }
           : {}),
         example_sentence: exampleSentence || null,
+        ...(body.grammaticalRole !== undefined
+          ? { grammatical_role: grammaticalRole || "unknown" }
+          : {}),
+        ...(body.usageNote !== undefined
+          ? { usage_note: usageNote || "" }
+          : {}),
+        ...(body.commonCollocations !== undefined
+          ? { common_collocations: commonCollocations }
+          : {}),
         ...(body.partOfSpeech !== undefined
           ? { part_of_speech: partOfSpeech || null }
           : {}),

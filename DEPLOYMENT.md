@@ -165,6 +165,7 @@ After the first Vercel deploy:
 8. Sign in there and confirm the same vocab library is visible.
 9. Review a card on desktop, then refresh on phone and confirm the updated due date is reflected there too.
 10. Open `Settings`, run `Regenerate with AI`, and confirm existing vocabulary receives the new definition, example, lemma, and cloze fields without changing review schedules.
+11. Search an inflected form such as `subsidized` and confirm it remains the learning target while `subsidize` appears only as the related lemma.
 
 Expected behavior right now:
 

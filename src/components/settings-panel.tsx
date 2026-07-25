@@ -161,8 +161,9 @@ export function SettingsPanel() {
                 AI vocabulary content
               </p>
               <p className="mt-2 text-sm leading-6 text-[color:var(--color-muted)]">
-                Regenerate definitions, examples, lemmas, and cloze answers.
-                Review schedules and history are not changed.
+                Regenerate form-specific definitions, examples, roles, usage,
+                collocations, lemmas, and cloze answers. Review schedules and
+                history are not changed.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button

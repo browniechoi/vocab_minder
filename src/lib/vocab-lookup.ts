@@ -24,6 +24,13 @@ export async function lookupVocabEntry(
     };
   }
 
+  if (
+    process.env.OPENAI_API_KEY &&
+    generatedResult.status === "rejected"
+  ) {
+    throw generatedResult.reason;
+  }
+
   if (merriamEntry) {
     return merriamEntry;
   }

@@ -7,7 +7,12 @@ type MockDictionarySeed = Omit<
   | "answerLemma"
   | "clozeAnswer"
   | "clozeSentence"
+  | "commonCollocations"
   | "contentProvider"
+  | "grammaticalRole"
+  | "senseKey"
+  | "usageNote"
+  | "wordFamilyKey"
 >;
 
 const SEEDS: MockDictionarySeed[] = [
@@ -124,6 +129,11 @@ const ENTRIES: DictionaryEntry[] = SEEDS.map((entry) => ({
     buildClozeFromAnswer(entry.exampleSentence, entry.canonicalTerm) ??
     `Use this word in context: ${CLOZE_BLANK}.`,
   acceptedAnswers: [entry.canonicalTerm],
+  grammaticalRole: entry.partOfSpeech,
+  usageNote: "",
+  commonCollocations: [],
+  wordFamilyKey: entry.canonicalTerm,
+  senseKey: entry.partOfSpeech,
   contentProvider: "manual",
 }));
 

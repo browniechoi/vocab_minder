@@ -39,6 +39,11 @@ export type VocabRow = {
   cloze_answer?: string | null;
   accepted_answers?: unknown;
   part_of_speech: string | null;
+  grammatical_role?: string | null;
+  usage_note?: string | null;
+  common_collocations?: unknown;
+  word_family_key?: string | null;
+  sense_key?: string | null;
   pronunciations: unknown;
   notes: string | null;
   content_provider?: string | null;
@@ -53,7 +58,7 @@ export type VocabRow = {
 };
 
 export const VOCAB_ROW_SELECT =
-  "id, original_query, canonical_term, normalized_term, definition, definition_labels, example_sentence, cloze_sentence, answer_lemma, cloze_answer, accepted_answers, part_of_speech, pronunciations, notes, content_provider, content_model, content_prompt_version, content_generated_at, content_edited_at, status, search_count, last_searched_at, created_at";
+  "id, original_query, canonical_term, normalized_term, definition, definition_labels, example_sentence, cloze_sentence, answer_lemma, cloze_answer, accepted_answers, part_of_speech, grammatical_role, usage_note, common_collocations, word_family_key, sense_key, pronunciations, notes, content_provider, content_model, content_prompt_version, content_generated_at, content_edited_at, status, search_count, last_searched_at, created_at";
 
 export type CardRow = {
   id: string;
@@ -120,14 +125,14 @@ function normalizePronunciations(value: unknown): Pronunciation[] {
   });
 }
 
-function normalizeStoredAnswers(value: unknown, fallback: string) {
-  const answers = Array.isArray(value)
+function normalizeStoredStrings(value: unknown, fallback: string[] = []) {
+  const values = Array.isArray(value)
     ? value.flatMap((item) =>
         typeof item === "string" && item.trim() ? [item.trim()] : [],
       )
     : [];
 
-  return answers.length > 0 ? [...new Set(answers)] : [fallback];
+  return values.length > 0 ? [...new Set(values)] : fallback;
 }
 
 function normalizeContentProvider(value: unknown): VocabContentProvider {
@@ -160,7 +165,10 @@ export function mapVocabRowToPersistedItem(row: VocabRow): PersistedVocabItem {
     storedLabels.length > 0 ? storedLabels : fallbackDefinitionParts.definitionLabels;
   const answerLemma =
     row.answer_lemma?.trim() || row.canonical_term.replace(/:\d+$/u, "");
-  const clozeAnswer = row.cloze_answer?.trim() || answerLemma;
+  const clozeAnswer = row.cloze_answer?.trim() || row.canonical_term;
+  const wordFamilyKey =
+    row.word_family_key?.trim() ||
+    answerLemma.toLowerCase().replace(/[^a-z0-9]+/gu, "-");
 
   return {
     id: row.id,
@@ -168,16 +176,24 @@ export function mapVocabRowToPersistedItem(row: VocabRow): PersistedVocabItem {
     canonicalTerm: row.canonical_term,
     normalizedTerm: row.normalized_term,
     partOfSpeech: row.part_of_speech ?? "unknown",
+    grammaticalRole:
+      row.grammatical_role?.trim() || row.part_of_speech || "unknown",
     definition:
       storedLabels.length > 0 ? row.definition : fallbackDefinitionParts.definition,
     definitionLabels,
+    usageNote: row.usage_note?.trim() ?? "",
+    commonCollocations: normalizeStoredStrings(row.common_collocations),
     exampleSentence:
       row.example_sentence ?? "No example sentence available in this entry.",
     clozeSentence:
       row.cloze_sentence ?? `Use this word in context: _____.`,
     answerLemma,
     clozeAnswer,
-    acceptedAnswers: normalizeStoredAnswers(row.accepted_answers, answerLemma),
+    acceptedAnswers: normalizeStoredStrings(row.accepted_answers, [
+      row.canonical_term,
+    ]),
+    wordFamilyKey,
+    senseKey: row.sense_key?.trim() || "primary",
     pronunciations: normalizePronunciations(row.pronunciations),
     notes: row.notes ?? undefined,
     contentProvider: normalizeContentProvider(row.content_provider),

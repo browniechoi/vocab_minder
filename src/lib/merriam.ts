@@ -202,7 +202,10 @@ function isMerriamEntry(value: unknown): value is MerriamEntry {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function toDictionaryEntry(payload: unknown): DictionaryEntry | null {
+export function toDictionaryEntry(
+  payload: unknown,
+  query?: string,
+): DictionaryEntry | null {
   if (!Array.isArray(payload) || payload.length === 0) {
     return null;
   }
@@ -213,12 +216,17 @@ export function toDictionaryEntry(payload: unknown): DictionaryEntry | null {
   }
 
   const appShortDef = firstEntry.meta?.["app-shortdef"];
-  const canonicalTerm = stripHeadwordSuffix(cleanMerriamText(
-    appShortDef?.hw ??
-      firstEntry.hwi?.hw ??
-      firstEntry.meta?.id?.split(":")[0] ??
-      "",
-  ));
+  const answerLemma = stripHeadwordSuffix(
+    cleanMerriamText(
+      appShortDef?.hw ??
+        firstEntry.hwi?.hw ??
+        firstEntry.meta?.id?.split(":")[0] ??
+        "",
+    ),
+  );
+  const canonicalTerm =
+    cleanMerriamText(query ?? "").toLowerCase() || answerLemma;
+  const partOfSpeech = appShortDef?.fl ?? firstEntry.fl ?? "unknown";
   const extractedDefinition =
     extractDefinition(firstEntry) ??
     extractFallbackDefinition(appShortDef?.def?.[0] ?? firstEntry.shortdef?.[0]);
@@ -226,23 +234,28 @@ export function toDictionaryEntry(payload: unknown): DictionaryEntry | null {
   const exampleSentence =
     extractExample(firstEntry) || "No example sentence available in this entry.";
 
-  if (!canonicalTerm || !definition) {
+  if (!canonicalTerm || !answerLemma || !definition) {
     return null;
   }
 
   return {
     canonicalTerm,
     normalizedTerm: canonicalTerm.toLowerCase(),
-    partOfSpeech: appShortDef?.fl ?? firstEntry.fl ?? "unknown",
+    partOfSpeech,
+    grammaticalRole: partOfSpeech,
     definition,
     definitionLabels: extractedDefinition.definitionLabels,
+    usageNote: "",
+    commonCollocations: [],
     exampleSentence,
     clozeSentence:
       buildClozeFromAnswer(exampleSentence, canonicalTerm) ??
       `Use this word in context: ${CLOZE_BLANK}.`,
-    answerLemma: canonicalTerm,
+    answerLemma,
     clozeAnswer: canonicalTerm,
     acceptedAnswers: [canonicalTerm],
+    wordFamilyKey: answerLemma.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    senseKey: partOfSpeech.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     pronunciations: extractPronunciations(firstEntry),
     notes: "Imported from Merriam-Webster Learner's Dictionary.",
     lookupKeys: firstEntry.meta?.stems?.map((stem) => stem.toLowerCase()) ?? [],
@@ -267,5 +280,5 @@ export async function lookupMerriamEntry(query: string, apiKey: string) {
     throw new Error(`Merriam lookup failed with status ${response.status}.`);
   }
 
-  return toDictionaryEntry((await response.json()) as unknown);
+  return toDictionaryEntry((await response.json()) as unknown, query);
 }

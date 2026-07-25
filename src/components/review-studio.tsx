@@ -62,9 +62,12 @@ function normalizeTypedAnswer(value: string) {
     .trim();
 }
 
-function getAcceptedTypedAnswers(answerLemma: string, acceptedAnswers: string[]) {
+function getAcceptedTypedAnswers(
+  learningTarget: string,
+  acceptedAnswers: string[],
+) {
   return new Set(
-    [answerLemma, ...acceptedAnswers]
+    [learningTarget, ...acceptedAnswers]
       .map(normalizeTypedAnswer)
       .filter(Boolean),
   );
@@ -81,6 +84,7 @@ function removeTypedAnswer(
 
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday, updateVocabBack } = useAppState();
+  const [buriedFamilyKeys, setBuriedFamilyKeys] = useState<string[]>([]);
   const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
   const [editAcceptedAnswers, setEditAcceptedAnswers] = useState("");
   const [editAnswerLemma, setEditAnswerLemma] = useState("");
@@ -88,9 +92,12 @@ export function ReviewStudio() {
   const [editClozeAnswer, setEditClozeAnswer] = useState("");
   const [editingBackCardId, setEditingBackCardId] = useState<string | null>(null);
   const [editClozeSentence, setEditClozeSentence] = useState("");
+  const [editCommonCollocations, setEditCommonCollocations] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
   const [editDefinitionLabels, setEditDefinitionLabels] = useState("");
   const [editExampleSentence, setEditExampleSentence] = useState("");
+  const [editGrammaticalRole, setEditGrammaticalRole] = useState("");
+  const [editUsageNote, setEditUsageNote] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSavingBack, setIsSavingBack] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -99,15 +106,24 @@ export function ReviewStudio() {
     useState<SessionFeedback | null>(null);
   const [typedAnswers, setTypedAnswers] = useState<Record<string, string>>({});
 
-  const dueItemIds = new Set(dueItems.map((item) => item.reviewCard.id));
+  const availableDueItems = dueItems.filter(
+    (item) => !buriedFamilyKeys.includes(item.wordFamilyKey),
+  );
+  const dueItemIds = new Set(
+    availableDueItems.map((item) => item.reviewCard.id),
+  );
   const activeDeferredAgainIds = deferredAgainIds.filter((id) => dueItemIds.has(id));
   const deferredAgainIdSet = new Set(activeDeferredAgainIds);
   const deferredAgainItems = activeDeferredAgainIds.flatMap((id) => {
-    const item = dueItems.find((candidate) => candidate.reviewCard.id === id);
+    const item = availableDueItems.find(
+      (candidate) => candidate.reviewCard.id === id,
+    );
     return item ? [item] : [];
   });
   const sessionQueue = [
-    ...dueItems.filter((item) => !deferredAgainIdSet.has(item.reviewCard.id)),
+    ...availableDueItems.filter(
+      (item) => !deferredAgainIdSet.has(item.reviewCard.id),
+    ),
     ...deferredAgainItems,
   ];
 
@@ -181,7 +197,7 @@ export function ReviewStudio() {
     }
 
     const acceptedAnswers = getAcceptedTypedAnswers(
-      current.answerLemma,
+      current.canonicalTerm,
       current.acceptedAnswers,
     );
     if (!acceptedAnswers.has(normalizedAnswer)) {
@@ -189,9 +205,13 @@ export function ReviewStudio() {
       setSessionFeedback({
         message:
           normalizedAnswer === normalizeTypedAnswer(current.clozeAnswer) &&
-          normalizedAnswer !== normalizeTypedAnswer(current.answerLemma)
-            ? `Correct word, but that is the sentence form. Reverse recall expects the lemma “${current.answerLemma}”.`
-            : "Not quite. The correct lemma is shown below; self-grade this card.",
+          normalizedAnswer !== normalizeTypedAnswer(current.canonicalTerm)
+            ? `That fits the sentence, but this card targets the searched form “${current.canonicalTerm}”.`
+            : normalizedAnswer === normalizeTypedAnswer(current.answerLemma) &&
+                normalizedAnswer !==
+                  normalizeTypedAnswer(current.canonicalTerm)
+              ? `That is the related lemma. This card targets “${current.canonicalTerm}”.`
+              : "Not quite. The target form is shown below; self-grade this card.",
         tone: "error",
       });
       return;
@@ -214,6 +234,9 @@ export function ReviewStudio() {
       setTypedAnswers((currentAnswers) =>
         removeTypedAnswer(currentAnswers, currentCardId),
       );
+      setBuriedFamilyKeys((currentKeys) => [
+        ...new Set([...currentKeys, current.wordFamilyKey]),
+      ]);
       setRevealedCardId(null);
       setSessionFeedback({
         message: "Correct. Marked Easy and moved forward.",
@@ -299,7 +322,7 @@ export function ReviewStudio() {
               </p>
               <label className="block">
                 <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
-                  Type the dictionary form
+                  Type the searched form
                 </span>
                 <input
                   key={currentCardId}
@@ -361,11 +384,16 @@ export function ReviewStudio() {
                         setEditAnswerLemma(current.answerLemma);
                         setEditClozeAnswer(current.clozeAnswer);
                         setEditClozeSentence(current.clozeSentence);
+                        setEditCommonCollocations(
+                          current.commonCollocations.join(", "),
+                        );
                         setEditDefinition(current.definition);
                         setEditDefinitionLabels(
                           current.definitionLabels?.join(", ") ?? "",
                         );
                         setEditExampleSentence(current.exampleSentence);
+                        setEditGrammaticalRole(current.grammaticalRole);
+                        setEditUsageNote(current.usageNote);
                       }}
                       className="rounded-full border border-[color:var(--color-border)] px-2.5 py-1 text-xs font-medium text-[color:var(--color-foreground)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
                     >
@@ -390,10 +418,16 @@ export function ReviewStudio() {
                           answerLemma: editAnswerLemma,
                           clozeAnswer: editClozeAnswer,
                           clozeSentence: editClozeSentence,
+                          commonCollocations: editCommonCollocations
+                            .split(",")
+                            .map((collocation) => collocation.trim())
+                            .filter(Boolean),
                           definition: editDefinition,
                           definitionLabels:
                             parseDefinitionLabelText(editDefinitionLabels),
                           exampleSentence: editExampleSentence,
+                          grammaticalRole: editGrammaticalRole,
+                          usageNote: editUsageNote,
                         });
 
                         if (!result.success) {
@@ -412,7 +446,7 @@ export function ReviewStudio() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="block">
                         <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
-                          Answer lemma
+                          Family lemma
                         </span>
                         <input
                           required
@@ -439,7 +473,7 @@ export function ReviewStudio() {
                     </div>
                     <label className="block">
                       <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
-                        Accepted lemma answers
+                        Accepted target answers
                       </span>
                       <input
                         required
@@ -453,6 +487,19 @@ export function ReviewStudio() {
                     </label>
                     <label className="block">
                       <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Grammatical role
+                      </span>
+                      <input
+                        value={editGrammaticalRole}
+                        onChange={(event) =>
+                          setEditGrammaticalRole(event.target.value)
+                        }
+                        placeholder="adjective derived from a past participle"
+                        className="mt-1.5 h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
                         Labels
                       </span>
                       <input
@@ -461,6 +508,29 @@ export function ReviewStudio() {
                           setEditDefinitionLabels(event.target.value)
                         }
                         placeholder="formal, literary"
+                        className="mt-1.5 h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Usage note
+                      </span>
+                      <textarea
+                        value={editUsageNote}
+                        onChange={(event) => setEditUsageNote(event.target.value)}
+                        className="mt-1.5 min-h-16 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm leading-6 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Common collocations
+                      </span>
+                      <input
+                        value={editCommonCollocations}
+                        onChange={(event) =>
+                          setEditCommonCollocations(event.target.value)
+                        }
+                        placeholder="subsidized housing, subsidized loans"
                         className="mt-1.5 h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
                       />
                     </label>
@@ -536,11 +606,16 @@ export function ReviewStudio() {
                         Correct spelling
                       </p>
                       <h2 className="text-3xl font-semibold text-[color:var(--color-foreground)]">
-                        {current.answerLemma}
+                        {current.canonicalTerm}
                       </h2>
                       <p className="text-sm text-[color:var(--color-muted)]">
-                        {current.partOfSpeech}
+                        {current.grammaticalRole || current.partOfSpeech}
                       </p>
+                      {current.answerLemma !== current.canonicalTerm ? (
+                        <p className="text-xs text-[color:var(--color-muted)]">
+                          Related lemma: {current.answerLemma}
+                        </p>
+                      ) : null}
                       <PronunciationList compact pronunciations={current.pronunciations} />
                     </div>
                   ) : (
@@ -559,9 +634,28 @@ export function ReviewStudio() {
                 ) : null}
               </div>
               {editingBackCardId !== current.id && !isProductionCard ? (
-                <p className="rounded-[18px] bg-[rgba(47,139,115,0.08)] px-4 py-3 text-sm italic leading-6 text-[color:var(--color-foreground)]">
-                  “{current.exampleSentence}”
-                </p>
+                <div className="space-y-3">
+                  <p className="rounded-[18px] bg-[rgba(47,139,115,0.08)] px-4 py-3 text-sm italic leading-6 text-[color:var(--color-foreground)]">
+                    “{current.exampleSentence}”
+                  </p>
+                  {current.usageNote ? (
+                    <p className="text-sm leading-6 text-[color:var(--color-muted)]">
+                      {current.usageNote}
+                    </p>
+                  ) : null}
+                  {current.commonCollocations.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {current.commonCollocations.map((collocation) => (
+                        <span
+                          key={collocation}
+                          className="rounded-full border border-[color:var(--color-border)] px-2.5 py-1 text-xs text-[color:var(--color-muted)]"
+                        >
+                          {collocation}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}
@@ -642,6 +736,11 @@ export function ReviewStudio() {
                     }
                     return remainingIds;
                   });
+                  if (rating !== "again") {
+                    setBuriedFamilyKeys((currentKeys) => [
+                      ...new Set([...currentKeys, current.wordFamilyKey]),
+                    ]);
+                  }
                   setBackEditMessage(null);
                   setEditingBackCardId(null);
                   setRevealedCardId(null);

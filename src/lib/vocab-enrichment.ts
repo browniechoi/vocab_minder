@@ -6,15 +6,19 @@ type GeneratedVocabContent = {
   answerLemma: string;
   canonicalTerm: string;
   clozeAnswer: string;
+  commonCollocations: string[];
   definition: string;
   definitionLabels: string[];
   exampleSentence: string;
+  grammaticalRole: string;
   isValidVocabulary: boolean;
   lookupKeys: string[];
   partOfSpeech: string;
+  senseKey: string;
+  usageNote: string;
 };
 
-export const OPENAI_VOCAB_PROMPT_VERSION = "2026-07-25-v1";
+export const OPENAI_VOCAB_PROMPT_VERSION = "2026-07-25-v2";
 
 const GENERATED_VOCAB_SCHEMA = {
   type: "object",
@@ -27,27 +31,44 @@ const GENERATED_VOCAB_SCHEMA = {
     },
     canonicalTerm: {
       type: "string",
-      description: "The canonical dictionary headword or established phrase.",
+      description:
+        "The exact word form or phrase being learned. Preserve a valid inflected query instead of lemmatizing it.",
     },
     answerLemma: {
       type: "string",
       description:
-        "The canonical lemma expected for meaning-to-word reverse recall.",
+        "The dictionary lemma used only to group related forms into a word family.",
     },
     partOfSpeech: {
       type: "string",
       description: "The part of speech for the generated sense.",
     },
+    grammaticalRole: {
+      type: "string",
+      description:
+        "The specific role of this form, such as adjective, past-tense verb, past participle, plural noun, or base-form verb.",
+    },
     definition: {
       type: "string",
       description:
-        "A learner-friendly explanation of meaning and practical usage.",
+        "A learner-friendly explanation of what this exact queried form means in its selected real-world use.",
     },
     definitionLabels: {
       type: "array",
       items: { type: "string" },
       description:
         "Register or domain labels such as formal, literary, medical, or informal.",
+    },
+    usageNote: {
+      type: "string",
+      description:
+        "One concise note explaining where or how this exact form is commonly used.",
+    },
+    commonCollocations: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Two to five common real-world combinations containing this exact form.",
     },
     exampleSentence: {
       type: "string",
@@ -63,7 +84,12 @@ const GENERATED_VOCAB_SCHEMA = {
       type: "array",
       items: { type: "string" },
       description:
-        "Valid spelling variants of answerLemma, excluding inflected forms.",
+        "Valid spelling variants of canonicalTerm. Do not include other grammatical forms.",
+    },
+    senseKey: {
+      type: "string",
+      description:
+        "A short lowercase kebab-case identifier for the selected grammatical role and meaning.",
     },
     lookupKeys: {
       type: "array",
@@ -76,11 +102,15 @@ const GENERATED_VOCAB_SCHEMA = {
     "canonicalTerm",
     "answerLemma",
     "partOfSpeech",
+    "grammaticalRole",
     "definition",
     "definitionLabels",
+    "usageNote",
+    "commonCollocations",
     "exampleSentence",
     "clozeAnswer",
     "acceptedAnswers",
+    "senseKey",
     "lookupKeys",
   ],
 } as const;
@@ -102,6 +132,10 @@ function normalizeTerm(value: string) {
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function buildWordFamilyKey(lemma: string) {
+  return normalizeTerm(lemma).replace(/\s+/g, "-");
 }
 
 function normalizeStringArray(
@@ -170,34 +204,45 @@ function toDictionaryEntry(
   }
 
   const answerLemma = clampText(generated.answerLemma, 120);
-  const generatedCanonicalTerm = clampText(generated.canonicalTerm, 120);
-  const canonicalTerm =
-    generatedCanonicalTerm &&
-    normalizeTerm(generatedCanonicalTerm) === normalizeTerm(answerLemma)
-      ? generatedCanonicalTerm
-      : answerLemma;
-  const normalizedTerm = normalizeTerm(answerLemma || canonicalTerm);
+  const canonicalTerm = clampText(generated.canonicalTerm, 120);
+  const normalizedTerm = normalizeTerm(canonicalTerm);
+  const normalizedQuery = normalizeTerm(query);
   const definition = clampText(generated.definition, 420);
   const exampleSentence = clampText(generated.exampleSentence, 420);
   const clozeAnswer = clampText(generated.clozeAnswer, 120);
   const clozeSentence = buildClozeFromAnswer(exampleSentence, clozeAnswer);
+  const wordFamilyKey = buildWordFamilyKey(answerLemma);
+  const senseKey =
+    normalizeTerm(clampText(generated.senseKey, 120)).replace(/\s+/g, "-") ||
+    "primary";
 
   if (
     !answerLemma ||
     !canonicalTerm ||
     !normalizedTerm ||
+    normalizedTerm !== normalizedQuery ||
     !definition ||
     !exampleSentence ||
     !clozeAnswer ||
-    !clozeSentence
+    !clozeSentence ||
+    !wordFamilyKey
   ) {
-    throw new Error("OpenAI returned an internally inconsistent vocabulary card.");
+    throw new Error(
+      "OpenAI returned an internally inconsistent or lemmatized vocabulary card.",
+    );
   }
 
   const acceptedAnswers = normalizeStringArray(
-    [answerLemma, canonicalTerm, ...generated.acceptedAnswers],
+    [canonicalTerm, ...generated.acceptedAnswers],
     12,
     120,
+  );
+  const commonCollocations = normalizeStringArray(
+    generated.commonCollocations,
+    5,
+    120,
+  ).filter((collocation) =>
+    collocation.toLowerCase().includes(canonicalTerm.toLowerCase()),
   );
   const lookupKeys = normalizeStringArray(
     [query, canonicalTerm, answerLemma, ...generated.lookupKeys],
@@ -209,17 +254,23 @@ function toDictionaryEntry(
     canonicalTerm,
     normalizedTerm,
     partOfSpeech: clampText(generated.partOfSpeech, 80) || "unknown",
+    grammaticalRole:
+      clampText(generated.grammaticalRole, 120) || "unknown",
     definition,
     definitionLabels: normalizeStringArray(
       generated.definitionLabels,
       8,
       40,
     ),
+    usageNote: clampText(generated.usageNote, 280),
+    commonCollocations,
     exampleSentence,
     clozeSentence,
     answerLemma,
     clozeAnswer,
     acceptedAnswers,
+    wordFamilyKey,
+    senseKey,
     pronunciations: [],
     notes: "Generated for learner context with OpenAI.",
     lookupKeys,
@@ -255,13 +306,18 @@ export async function generateVocabEntry(query: string) {
             role: "system",
             content: [
               "Create one high-quality English vocabulary learning record for an adult learner.",
-              "Use the most common general-English sense that matches the query.",
-              "If the query is inflected, answerLemma and canonicalTerm must use the dictionary lemma.",
+              "Treat the exact query as the learning target and choose its most common life-applicable general-English use.",
+              "canonicalTerm must preserve the query's grammatical form. Never replace a valid inflected form with its lemma.",
+              "For example, canonicalTerm for 'subsidized' must be 'subsidized', while answerLemma is 'subsidize'.",
+              "Use grammaticalRole to distinguish uses such as an adjective from a past-tense verb.",
+              "answerLemma is family metadata only and is not the expected reverse-recall answer.",
               "Keep register and domain labels separate from the definition.",
-              "The definition must be clear, practical, and must not contain the answerLemma.",
+              "The definition must explain the exact canonicalTerm's selected use clearly and practically without containing canonicalTerm.",
+              "Prefer an example where clozeAnswer exactly matches canonicalTerm when natural.",
               "Write one concrete, realistic example sentence that makes the intended meaning obvious from context.",
               "The example must contain clozeAnswer exactly once. clozeAnswer must be the exact grammatical surface form used in that sentence.",
-              "acceptedAnswers may contain spelling variants of answerLemma, but never tense, plural, comparative, or other inflected forms.",
+              "acceptedAnswers may contain spelling variants of canonicalTerm, but never other tense, plural, comparative, or inflected forms.",
+              "commonCollocations must be natural, frequent-looking combinations that include canonicalTerm exactly.",
               "If the query is not a real English word or established phrase, set isValidVocabulary to false and return empty values for the remaining fields.",
             ].join(" "),
           },
@@ -270,7 +326,7 @@ export async function generateVocabEntry(query: string) {
             content: JSON.stringify({ query }),
           },
         ],
-        max_output_tokens: 900,
+        max_output_tokens: 1200,
         text: {
           format: {
             type: "json_schema",

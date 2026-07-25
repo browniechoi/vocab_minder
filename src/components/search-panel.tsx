@@ -126,8 +126,15 @@ export function SearchPanel() {
                         {lastResult.entry.canonicalTerm}
                       </h3>
                       <p className="text-sm text-[color:var(--color-muted)]">
-                        {lastResult.entry.partOfSpeech}
+                        {lastResult.entry.grammaticalRole ||
+                          lastResult.entry.partOfSpeech}
                       </p>
+                      {lastResult.entry.answerLemma !==
+                      lastResult.entry.canonicalTerm ? (
+                        <p className="text-xs text-[color:var(--color-muted)]">
+                          Related lemma: {lastResult.entry.answerLemma}
+                        </p>
+                      ) : null}
                       <PronunciationList
                         pronunciations={lastResult.entry.pronunciations}
                         compact
@@ -148,6 +155,23 @@ export function SearchPanel() {
                   <p className="mt-3 text-sm italic text-[color:var(--color-muted)]">
                     “{lastResult.entry.exampleSentence}”
                   </p>
+                  {lastResult.entry.usageNote ? (
+                    <p className="mt-3 text-sm leading-6 text-[color:var(--color-muted)]">
+                      {lastResult.entry.usageNote}
+                    </p>
+                  ) : null}
+                  {lastResult.entry.commonCollocations.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {lastResult.entry.commonCollocations.map((collocation) => (
+                        <span
+                          key={collocation}
+                          className="rounded-full border border-black/10 px-2.5 py-1 text-xs text-[color:var(--color-muted)]"
+                        >
+                          {collocation}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -248,7 +272,8 @@ export function SearchPanel() {
                       {item.canonicalTerm}
                     </p>
                     <p className="text-sm text-[color:var(--color-muted)]">
-                      {item.partOfSpeech} · {item.searchCount} searches
+                      {item.grammaticalRole || item.partOfSpeech} ·{" "}
+                      {item.searchCount} searches
                     </p>
                   </div>
                   <span className="rounded-full bg-[rgba(17,32,57,0.08)] px-3 py-1 text-xs font-medium text-[color:var(--color-foreground)]">

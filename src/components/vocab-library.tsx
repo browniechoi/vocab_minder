@@ -25,12 +25,15 @@ export function VocabLibrary() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editClozeAnswer, setEditClozeAnswer] = useState("");
   const [editClozeSentence, setEditClozeSentence] = useState("");
+  const [editCommonCollocations, setEditCommonCollocations] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
   const [editDefinitionLabels, setEditDefinitionLabels] = useState("");
   const [editExampleSentence, setEditExampleSentence] = useState("");
+  const [editGrammaticalRole, setEditGrammaticalRole] = useState("");
   const [editMessage, setEditMessage] = useState<string | null>(null);
   const [editPartOfSpeech, setEditPartOfSpeech] = useState("");
   const [editTerm, setEditTerm] = useState("");
+  const [editUsageNote, setEditUsageNote] = useState("");
   const [filter, setFilter] = useState<FilterMode>("all");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [query, setQuery] = useState("");
@@ -43,11 +46,14 @@ export function VocabLibrary() {
     setEditAnswerLemma(item.answerLemma);
     setEditClozeAnswer(item.clozeAnswer);
     setEditClozeSentence(item.clozeSentence);
+    setEditCommonCollocations(item.commonCollocations.join(", "));
     setEditDefinition(item.definition);
     setEditDefinitionLabels(item.definitionLabels?.join(", ") ?? "");
     setEditExampleSentence(item.exampleSentence);
+    setEditGrammaticalRole(item.grammaticalRole);
     setEditPartOfSpeech(item.partOfSpeech);
     setEditTerm(item.canonicalTerm);
+    setEditUsageNote(item.usageNote);
   }
 
   const items = [...activeItems, ...archivedItems]
@@ -147,11 +153,17 @@ export function VocabLibrary() {
                                 : editTerm,
                             clozeAnswer: editClozeAnswer,
                             clozeSentence: editClozeSentence,
+                            commonCollocations: editCommonCollocations
+                              .split(",")
+                              .map((collocation) => collocation.trim())
+                              .filter(Boolean),
                             definition: editDefinition,
                             definitionLabels:
                               parseDefinitionLabelText(editDefinitionLabels),
                             exampleSentence: editExampleSentence,
+                            grammaticalRole: editGrammaticalRole,
                             partOfSpeech: editPartOfSpeech,
+                            usageNote: editUsageNote,
                           });
 
                           if (!result.success) {
@@ -170,7 +182,7 @@ export function VocabLibrary() {
                       <div className="grid gap-4 md:grid-cols-[1fr_0.45fr]">
                         <label className="block">
                           <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
-                            Word
+                            Learning target
                           </span>
                           <input
                             required
@@ -195,7 +207,7 @@ export function VocabLibrary() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
                           <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
-                            Answer lemma
+                            Family lemma
                           </span>
                           <input
                             required
@@ -222,7 +234,7 @@ export function VocabLibrary() {
                       </div>
                       <label className="block">
                         <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
-                          Accepted lemma answers
+                          Accepted target answers
                         </span>
                         <input
                           required
@@ -236,6 +248,19 @@ export function VocabLibrary() {
                       </label>
                       <label className="block">
                         <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Grammatical role
+                        </span>
+                        <input
+                          value={editGrammaticalRole}
+                          onChange={(event) =>
+                            setEditGrammaticalRole(event.target.value)
+                          }
+                          placeholder="adjective derived from a past participle"
+                          className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
                           Labels
                         </span>
                         <input
@@ -244,6 +269,29 @@ export function VocabLibrary() {
                             setEditDefinitionLabels(event.target.value)
                           }
                           placeholder="formal, literary"
+                          className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Usage note
+                        </span>
+                        <textarea
+                          value={editUsageNote}
+                          onChange={(event) => setEditUsageNote(event.target.value)}
+                          className="mt-2 min-h-20 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 py-3 text-sm leading-7 text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Common collocations
+                        </span>
+                        <input
+                          value={editCommonCollocations}
+                          onChange={(event) =>
+                            setEditCommonCollocations(event.target.value)
+                          }
+                          placeholder="subsidized housing, subsidized loans"
                           className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
                         />
                       </label>
@@ -321,12 +369,17 @@ export function VocabLibrary() {
                           {item.status}
                         </span>
                         <span className="rounded-full bg-[rgba(221,107,63,0.12)] px-3 py-1 text-xs font-medium text-[color:var(--color-accent)]">
-                          {item.partOfSpeech}
+                          {item.grammaticalRole || item.partOfSpeech}
                         </span>
                       </div>
                       <p className="mt-4 text-sm leading-7 text-[color:var(--color-foreground)]">
                         {item.definition}
                       </p>
+                      {item.answerLemma !== item.canonicalTerm ? (
+                        <p className="mt-2 text-xs text-[color:var(--color-muted)]">
+                          Related lemma: {item.answerLemma}
+                        </p>
+                      ) : null}
                       <DefinitionLabelList labels={item.definitionLabels} />
                       <PronunciationList
                         pronunciations={item.pronunciations}
@@ -335,6 +388,23 @@ export function VocabLibrary() {
                       <p className="mt-3 text-sm italic leading-7 text-[color:var(--color-muted)]">
                         “{item.exampleSentence}”
                       </p>
+                      {item.usageNote ? (
+                        <p className="mt-2 text-sm leading-7 text-[color:var(--color-muted)]">
+                          {item.usageNote}
+                        </p>
+                      ) : null}
+                      {item.commonCollocations.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {item.commonCollocations.map((collocation) => (
+                            <span
+                              key={collocation}
+                              className="rounded-full border border-[color:var(--color-border)] px-2.5 py-1 text-xs text-[color:var(--color-muted)]"
+                            >
+                              {collocation}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                       {item.clozeSentence ? (
                         <p className="mt-2 text-sm italic leading-7 text-[color:var(--color-muted)]">
                           Cloze: “{item.clozeSentence}”

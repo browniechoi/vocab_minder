@@ -89,10 +89,13 @@ type VocabBackUpdate = {
   canonicalTerm?: string;
   clozeAnswer?: string;
   clozeSentence?: string;
+  commonCollocations?: string[];
   definition: string;
   definitionLabels?: string[];
   exampleSentence: string;
+  grammaticalRole?: string;
   partOfSpeech?: string;
+  usageNote?: string;
 };
 
 type AnswerCardResult = {
@@ -146,17 +149,23 @@ function normalizeClientState(state: AppState): AppState {
         item.answerLemma || item.canonicalTerm.replace(/:\d+$/u, ""),
       clozeAnswer:
         item.clozeAnswer ||
-        item.answerLemma ||
         item.canonicalTerm.replace(/:\d+$/u, ""),
       clozeSentence:
         item.clozeSentence || "Use this word in context: _____.",
       acceptedAnswers:
         item.acceptedAnswers?.length > 0
           ? item.acceptedAnswers
-          : [
-              item.answerLemma ||
-                item.canonicalTerm.replace(/:\d+$/u, ""),
-            ],
+          : [item.canonicalTerm.replace(/:\d+$/u, "")],
+      grammaticalRole:
+        item.grammaticalRole || item.partOfSpeech || "unknown",
+      usageNote: item.usageNote ?? "",
+      commonCollocations: item.commonCollocations ?? [],
+      wordFamilyKey:
+        item.wordFamilyKey ||
+        (item.answerLemma || item.canonicalTerm)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/gu, "-"),
+      senseKey: item.senseKey || "primary",
       contentProvider: item.contentProvider ?? "manual",
       reviewState: normalizeReviewState(
         item.reviewState,
@@ -641,6 +650,11 @@ export function AppStateProvider({
                     clozeAnswer: entry.clozeAnswer,
                     acceptedAnswers: entry.acceptedAnswers,
                     partOfSpeech: entry.partOfSpeech,
+                    grammaticalRole: entry.grammaticalRole,
+                    usageNote: entry.usageNote,
+                    commonCollocations: entry.commonCollocations,
+                    wordFamilyKey: entry.wordFamilyKey,
+                    senseKey: entry.senseKey,
                     pronunciations: entry.pronunciations,
                     notes: entry.notes,
                     contentProvider: entry.contentProvider,
@@ -1059,6 +1073,13 @@ export function AppStateProvider({
       const clozeAnswer = update.clozeAnswer?.trim();
       const canonicalTerm = update.canonicalTerm?.trim();
       const clozeSentence = update.clozeSentence?.trim();
+      const commonCollocations = [
+        ...new Set(
+          (update.commonCollocations ?? [])
+            .map((collocation) => collocation.trim())
+            .filter(Boolean),
+        ),
+      ];
       const definition = update.definition.trim();
       const exampleSentence = update.exampleSentence.trim();
       const acceptedAnswers = [
@@ -1072,7 +1093,9 @@ export function AppStateProvider({
         update.definitionLabels ?? [],
       );
       const normalizedTerm = canonicalTerm ? normalizeQuery(canonicalTerm) : "";
+      const grammaticalRole = update.grammaticalRole?.trim();
       const partOfSpeech = update.partOfSpeech?.trim();
+      const usageNote = update.usageNote?.trim();
 
       if (update.canonicalTerm !== undefined && !canonicalTerm) {
         return {
@@ -1139,8 +1162,7 @@ export function AppStateProvider({
                   const nextCanonicalTerm =
                     canonicalTerm ?? item.canonicalTerm;
                   const nextAnswerLemma =
-                    answerLemma ??
-                    (canonicalTerm ? canonicalTerm : item.answerLemma);
+                    answerLemma ?? item.answerLemma;
 
                   return {
                     ...item,
@@ -1154,10 +1176,28 @@ export function AppStateProvider({
                       update.acceptedAnswers !== undefined
                         ? acceptedAnswers
                         : canonicalTerm
-                          ? [nextAnswerLemma]
+                          ? [nextCanonicalTerm]
                           : item.acceptedAnswers,
+                    wordFamilyKey:
+                      answerLemma !== undefined
+                        ? answerLemma
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/gu, "-")
+                        : item.wordFamilyKey,
                     definition,
                     definitionLabels,
+                    grammaticalRole:
+                      update.grammaticalRole !== undefined
+                        ? grammaticalRole || "unknown"
+                        : item.grammaticalRole,
+                    usageNote:
+                      update.usageNote !== undefined
+                        ? usageNote ?? ""
+                        : item.usageNote,
+                    commonCollocations:
+                      update.commonCollocations !== undefined
+                        ? commonCollocations
+                        : item.commonCollocations,
                     clozeSentence:
                       update.clozeSentence !== undefined
                         ? clozeSentence!
@@ -1196,10 +1236,15 @@ export function AppStateProvider({
             canonicalTerm,
             clozeAnswer,
             clozeSentence,
+            ...(update.commonCollocations !== undefined
+              ? { commonCollocations }
+              : {}),
             definition,
             definitionLabels,
             exampleSentence,
+            grammaticalRole,
             partOfSpeech,
+            usageNote,
           }),
         });
         const payload = (await response.json()) as

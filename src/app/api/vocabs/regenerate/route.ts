@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
         try {
           const generated = await generateVocabEntry(
-            row.canonical_term || row.original_query,
+            row.original_query || row.canonical_term,
           );
           if (!generated) {
             throw new Error("The model did not recognize this vocabulary item.");
@@ -85,13 +85,20 @@ export async function POST(request: Request) {
           const { error: updateError } = await supabase
             .from("vocab_items")
             .update({
+              canonical_term: generated.canonicalTerm,
+              normalized_term: generated.normalizedTerm,
               definition: generated.definition,
               definition_labels: generated.definitionLabels ?? [],
+              grammatical_role: generated.grammaticalRole,
+              usage_note: generated.usageNote,
+              common_collocations: generated.commonCollocations,
               example_sentence: generated.exampleSentence,
               cloze_sentence: generated.clozeSentence,
               answer_lemma: generated.answerLemma,
               cloze_answer: generated.clozeAnswer,
               accepted_answers: generated.acceptedAnswers,
+              word_family_key: generated.wordFamilyKey,
+              sense_key: generated.senseKey,
               part_of_speech: generated.partOfSpeech,
               notes: generated.notes ?? null,
               dictionary_source: "openai",

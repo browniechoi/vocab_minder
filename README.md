@@ -7,6 +7,8 @@ VocabMinder is a staging-ready vocabulary web app for English learners:
 - archived items free a slot immediately
 - vocab items can also be deleted permanently when they were just search noise
 - review uses FSRS scheduling with separate recognition and production cards
+- searched forms remain distinct learning targets, while related forms share lemma-based family metadata
+- AI content includes grammatical role, practical usage guidance, and common collocations
 
 The current implementation is intentionally split in two:
 
