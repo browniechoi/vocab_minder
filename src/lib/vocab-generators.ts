@@ -147,7 +147,7 @@ async function generateWithGemini(
   const thinkingConfig = model.startsWith("gemini-2.5")
     ? { thinkingBudget: 512 }
     : {
-        thinkingLevel: model.includes("flash-lite") ? "minimal" : "low",
+        thinkingLevel: model.includes("flash-lite") ? "medium" : "low",
       };
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,

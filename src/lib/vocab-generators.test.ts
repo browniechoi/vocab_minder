@@ -72,7 +72,7 @@ test("generates and validates a form-specific Gemini entry", async (context) => 
     );
     assert.equal(
       requestBody.generationConfig?.thinkingConfig?.thinkingLevel,
-      "minimal",
+      "medium",
     );
 
     return Response.json({
