@@ -1,6 +1,16 @@
 import type { DictionaryEntry } from "@/lib/app-types";
+import { buildClozeFromAnswer, CLOZE_BLANK } from "@/lib/cloze";
 
-const ENTRIES: DictionaryEntry[] = [
+type MockDictionarySeed = Omit<
+  DictionaryEntry,
+  | "acceptedAnswers"
+  | "answerLemma"
+  | "clozeAnswer"
+  | "clozeSentence"
+  | "contentProvider"
+>;
+
+const SEEDS: MockDictionarySeed[] = [
   {
     canonicalTerm: "meticulous",
     normalizedTerm: "meticulous",
@@ -105,6 +115,17 @@ const ENTRIES: DictionaryEntry[] = [
     lookupKeys: ["vibrant", "vibrantly"],
   },
 ];
+
+const ENTRIES: DictionaryEntry[] = SEEDS.map((entry) => ({
+  ...entry,
+  answerLemma: entry.canonicalTerm,
+  clozeAnswer: entry.canonicalTerm,
+  clozeSentence:
+    buildClozeFromAnswer(entry.exampleSentence, entry.canonicalTerm) ??
+    `Use this word in context: ${CLOZE_BLANK}.`,
+  acceptedAnswers: [entry.canonicalTerm],
+  contentProvider: "manual",
+}));
 
 export function searchDictionary(query: string) {
   const normalizedQuery = query.trim().toLowerCase();

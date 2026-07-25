@@ -24,6 +24,8 @@ export type Pronunciation = {
   source: "merriam";
 };
 
+export type VocabContentProvider = "manual" | "merriam_webster" | "openai";
+
 export type DictionaryEntry = {
   canonicalTerm: string;
   normalizedTerm: string;
@@ -31,10 +33,17 @@ export type DictionaryEntry = {
   definition: string;
   definitionLabels?: string[];
   exampleSentence: string;
-  clozeSentence?: string;
+  clozeSentence: string;
+  answerLemma: string;
+  clozeAnswer: string;
+  acceptedAnswers: string[];
   pronunciations?: Pronunciation[];
   notes?: string;
   lookupKeys: string[];
+  contentProvider: VocabContentProvider;
+  contentModel?: string;
+  contentPromptVersion?: string;
+  contentGeneratedAt?: string;
 };
 
 export type ReviewState = {
@@ -60,9 +69,17 @@ export type VocabItem = {
   definition: string;
   definitionLabels?: string[];
   exampleSentence: string;
-  clozeSentence?: string;
+  clozeSentence: string;
+  answerLemma: string;
+  clozeAnswer: string;
+  acceptedAnswers: string[];
   pronunciations?: Pronunciation[];
   notes?: string;
+  contentProvider: VocabContentProvider;
+  contentModel?: string;
+  contentPromptVersion?: string;
+  contentGeneratedAt?: string;
+  contentEditedAt?: string;
   status: VocabStatus;
   searchCount: number;
   lastSearchedAt: string;

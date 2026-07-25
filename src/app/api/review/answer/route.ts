@@ -11,6 +11,7 @@ import {
 const VALID_RATINGS = new Set<ReviewRating>(["again", "hard", "good", "easy"]);
 
 type VocabTimingRow = {
+  answer_lemma: string;
   canonical_term: string;
   created_at: string;
   definition: string;
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 
     const { data: vocabRow, error: vocabError } = await supabase
       .from("vocab_items")
-      .select("canonical_term, created_at, definition, status")
+      .select("answer_lemma, canonical_term, created_at, definition, status")
       .eq("user_id", user.id)
       .eq("id", cardRow.vocab_item_id)
       .single<VocabTimingRow>();
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
     }
 
     const card = await ensureCardForVocabItem(supabase, user.id, {
+      answerLemma: vocabRow.answer_lemma,
       canonicalTerm: vocabRow.canonical_term,
       definition: vocabRow.definition,
       status: vocabRow.status,
@@ -105,6 +107,7 @@ export async function POST(request: Request) {
         supabase,
         user.id,
         {
+          answerLemma: vocabRow.answer_lemma,
           canonicalTerm: vocabRow.canonical_term,
           definition: vocabRow.definition,
           status: vocabRow.status,

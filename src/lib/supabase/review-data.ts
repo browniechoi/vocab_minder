@@ -173,6 +173,7 @@ export async function ensureCardForVocabItem(
   supabase: SupabaseRouteClient,
   userId: string,
   seed: {
+    answerLemma: string;
     canonicalTerm: string;
     definition: string;
     status: "active" | "archived";
@@ -199,7 +200,7 @@ export async function ensureCardForVocabItem(
       front_text:
         cardType === "production" ? seed.definition : seed.canonicalTerm,
       back_text:
-        cardType === "production" ? seed.canonicalTerm : seed.definition,
+        cardType === "production" ? seed.answerLemma : seed.definition,
       is_active: seed.status === "active",
     })
     .select("id, vocab_item_id, card_type, is_active")

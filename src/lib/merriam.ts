@@ -1,5 +1,9 @@
 import type { DictionaryEntry, Pronunciation } from "@/lib/app-types";
-import { stripHeadwordSuffix } from "@/lib/cloze";
+import {
+  buildClozeFromAnswer,
+  CLOZE_BLANK,
+  stripHeadwordSuffix,
+} from "@/lib/cloze";
 import {
   parseDefinitionLabelText,
   splitInlineDefinitionLabels,
@@ -219,6 +223,8 @@ export function toDictionaryEntry(payload: unknown): DictionaryEntry | null {
     extractDefinition(firstEntry) ??
     extractFallbackDefinition(appShortDef?.def?.[0] ?? firstEntry.shortdef?.[0]);
   const definition = extractedDefinition.definition;
+  const exampleSentence =
+    extractExample(firstEntry) || "No example sentence available in this entry.";
 
   if (!canonicalTerm || !definition) {
     return null;
@@ -230,11 +236,17 @@ export function toDictionaryEntry(payload: unknown): DictionaryEntry | null {
     partOfSpeech: appShortDef?.fl ?? firstEntry.fl ?? "unknown",
     definition,
     definitionLabels: extractedDefinition.definitionLabels,
-    exampleSentence:
-      extractExample(firstEntry) || "No example sentence available in this entry.",
+    exampleSentence,
+    clozeSentence:
+      buildClozeFromAnswer(exampleSentence, canonicalTerm) ??
+      `Use this word in context: ${CLOZE_BLANK}.`,
+    answerLemma: canonicalTerm,
+    clozeAnswer: canonicalTerm,
+    acceptedAnswers: [canonicalTerm],
     pronunciations: extractPronunciations(firstEntry),
     notes: "Imported from Merriam-Webster Learner's Dictionary.",
     lookupKeys: firstEntry.meta?.stems?.map((stem) => stem.toLowerCase()) ?? [],
+    contentProvider: "merriam_webster",
   };
 }
 

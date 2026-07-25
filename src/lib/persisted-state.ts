@@ -11,6 +11,7 @@ import type {
   ReviewMemoryState,
   ReviewRating,
   ReviewState,
+  VocabContentProvider,
   VocabItem,
 } from "@/lib/app-types";
 import {
@@ -34,9 +35,17 @@ export type VocabRow = {
   definition_labels?: unknown;
   example_sentence: string | null;
   cloze_sentence?: string | null;
+  answer_lemma?: string | null;
+  cloze_answer?: string | null;
+  accepted_answers?: unknown;
   part_of_speech: string | null;
   pronunciations: unknown;
   notes: string | null;
+  content_provider?: string | null;
+  content_model?: string | null;
+  content_prompt_version?: string | null;
+  content_generated_at?: string | null;
+  content_edited_at?: string | null;
   status: "active" | "archived";
   search_count: number;
   last_searched_at: string;
@@ -44,7 +53,7 @@ export type VocabRow = {
 };
 
 export const VOCAB_ROW_SELECT =
-  "id, original_query, canonical_term, normalized_term, definition, definition_labels, example_sentence, cloze_sentence, part_of_speech, pronunciations, notes, status, search_count, last_searched_at, created_at";
+  "id, original_query, canonical_term, normalized_term, definition, definition_labels, example_sentence, cloze_sentence, answer_lemma, cloze_answer, accepted_answers, part_of_speech, pronunciations, notes, content_provider, content_model, content_prompt_version, content_generated_at, content_edited_at, status, search_count, last_searched_at, created_at";
 
 export type CardRow = {
   id: string;
@@ -111,6 +120,22 @@ function normalizePronunciations(value: unknown): Pronunciation[] {
   });
 }
 
+function normalizeStoredAnswers(value: unknown, fallback: string) {
+  const answers = Array.isArray(value)
+    ? value.flatMap((item) =>
+        typeof item === "string" && item.trim() ? [item.trim()] : [],
+      )
+    : [];
+
+  return answers.length > 0 ? [...new Set(answers)] : [fallback];
+}
+
+function normalizeContentProvider(value: unknown): VocabContentProvider {
+  return value === "openai" || value === "manual"
+    ? value
+    : "merriam_webster";
+}
+
 export function createEmptyState(): AppState {
   return {
     planTier: "free",
@@ -133,6 +158,9 @@ export function mapVocabRowToPersistedItem(row: VocabRow): PersistedVocabItem {
   const fallbackDefinitionParts = splitInlineDefinitionLabels(row.definition);
   const definitionLabels =
     storedLabels.length > 0 ? storedLabels : fallbackDefinitionParts.definitionLabels;
+  const answerLemma =
+    row.answer_lemma?.trim() || row.canonical_term.replace(/:\d+$/u, "");
+  const clozeAnswer = row.cloze_answer?.trim() || answerLemma;
 
   return {
     id: row.id,
@@ -145,9 +173,18 @@ export function mapVocabRowToPersistedItem(row: VocabRow): PersistedVocabItem {
     definitionLabels,
     exampleSentence:
       row.example_sentence ?? "No example sentence available in this entry.",
-    clozeSentence: row.cloze_sentence ?? undefined,
+    clozeSentence:
+      row.cloze_sentence ?? `Use this word in context: _____.`,
+    answerLemma,
+    clozeAnswer,
+    acceptedAnswers: normalizeStoredAnswers(row.accepted_answers, answerLemma),
     pronunciations: normalizePronunciations(row.pronunciations),
     notes: row.notes ?? undefined,
+    contentProvider: normalizeContentProvider(row.content_provider),
+    contentModel: row.content_model ?? undefined,
+    contentPromptVersion: row.content_prompt_version ?? undefined,
+    contentGeneratedAt: row.content_generated_at ?? undefined,
+    contentEditedAt: row.content_edited_at ?? undefined,
     status: row.status,
     searchCount: row.search_count,
     lastSearchedAt: row.last_searched_at,

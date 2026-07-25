@@ -1,4 +1,4 @@
-const CLOZE_BLANK = "_____";
+export const CLOZE_BLANK = "_____";
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -54,7 +54,35 @@ export function containsClozeAnswer(value: string, term: string) {
 }
 
 export function isSafeClozeSentence(value: string, term: string) {
-  return value.includes(CLOZE_BLANK) && !containsClozeAnswer(value, term);
+  return (
+    value.split(CLOZE_BLANK).length === 2 && !containsClozeAnswer(value, term)
+  );
+}
+
+export function buildClozeFromAnswer(
+  exampleSentence: string,
+  clozeAnswer: string,
+) {
+  const answer = clozeAnswer.trim();
+  if (!answer) {
+    return null;
+  }
+
+  const answerPattern = escapeRegExp(answer).replace(/\s+/g, "\\s+");
+  const pattern = new RegExp(
+    `(^|[^a-z0-9'])(${answerPattern})(?=$|[^a-z0-9'])`,
+    "iu",
+  );
+  const match = pattern.exec(exampleSentence);
+
+  if (!match) {
+    return null;
+  }
+
+  const answerStart = match.index + match[1].length;
+  return `${exampleSentence.slice(0, answerStart)}${CLOZE_BLANK}${exampleSentence.slice(
+    answerStart + match[2].length,
+  )}`;
 }
 
 export function buildClozeSentence({

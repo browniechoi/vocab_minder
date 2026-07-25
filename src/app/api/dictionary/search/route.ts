@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { lookupMerriamEntry } from "@/lib/merriam";
-import { enrichDictionaryEntry } from "@/lib/vocab-enrichment";
+import { lookupVocabEntry } from "@/lib/vocab-lookup";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.trim() ?? "";
+  const pronunciationOnly = searchParams.get("pronunciationOnly") === "1";
 
   if (!query) {
     return NextResponse.json(
@@ -13,22 +14,15 @@ export async function GET(request: Request) {
     );
   }
 
-  const apiKey = process.env.MERRIAM_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        entry: null,
-        message: "MERRIAM_API_KEY is not configured. Add it to .env.local.",
-      },
-      { status: 500 },
-    );
-  }
-
   try {
-    const entry = await lookupMerriamEntry(query, apiKey);
+    const entry = pronunciationOnly
+      ? process.env.MERRIAM_API_KEY
+        ? await lookupMerriamEntry(query, process.env.MERRIAM_API_KEY)
+        : null
+      : await lookupVocabEntry(query);
 
     return NextResponse.json({
-      entry: entry ? await enrichDictionaryEntry(entry) : null,
+      entry,
       message: null,
     });
   } catch (error) {
@@ -38,7 +32,7 @@ export async function GET(request: Request) {
         message:
           error instanceof Error
             ? error.message
-            : "Dictionary lookup failed unexpectedly.",
+            : "Vocabulary generation failed unexpectedly.",
       },
       { status: 502 },
     );

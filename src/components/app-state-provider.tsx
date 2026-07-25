@@ -14,6 +14,7 @@ import {
   type VocabItem,
 } from "@/lib/app-types";
 import { normalizeDefinitionLabels } from "@/lib/definition-labels";
+import { CLOZE_BLANK } from "@/lib/cloze";
 import {
   attachReviewState,
   createEmptyState,
@@ -83,7 +84,10 @@ type RemoteReviewAnswerResponse = {
 };
 
 type VocabBackUpdate = {
+  acceptedAnswers?: string[];
+  answerLemma?: string;
   canonicalTerm?: string;
+  clozeAnswer?: string;
   clozeSentence?: string;
   definition: string;
   definitionLabels?: string[];
@@ -138,6 +142,22 @@ function normalizeClientState(state: AppState): AppState {
     ...state,
     items: state.items.map((item) => ({
       ...item,
+      answerLemma:
+        item.answerLemma || item.canonicalTerm.replace(/:\d+$/u, ""),
+      clozeAnswer:
+        item.clozeAnswer ||
+        item.answerLemma ||
+        item.canonicalTerm.replace(/:\d+$/u, ""),
+      clozeSentence:
+        item.clozeSentence || "Use this word in context: _____.",
+      acceptedAnswers:
+        item.acceptedAnswers?.length > 0
+          ? item.acceptedAnswers
+          : [
+              item.answerLemma ||
+                item.canonicalTerm.replace(/:\d+$/u, ""),
+            ],
+      contentProvider: item.contentProvider ?? "manual",
       reviewState: normalizeReviewState(
         item.reviewState,
         new Date(item.createdAt),
@@ -320,9 +340,15 @@ function upsertReviewCards(
 
 async function lookupDictionaryEntry(
   query: string,
+  options: { pronunciationOnly?: boolean } = {},
 ): Promise<DictionaryLookupResponse> {
+  const searchParams = new URLSearchParams({ q: query });
+  if (options.pronunciationOnly) {
+    searchParams.set("pronunciationOnly", "1");
+  }
+
   const response = await fetch(
-    `/api/dictionary/search?q=${encodeURIComponent(query)}`,
+    `/api/dictionary/search?${searchParams.toString()}`,
     {
       cache: "no-store",
     },
@@ -466,7 +492,9 @@ export function AppStateProvider({
         try {
           const lookup =
             item.canonicalTerm || item.originalQuery || item.normalizedTerm;
-          const { entry, ok } = await lookupDictionaryEntry(lookup);
+          const { entry, ok } = await lookupDictionaryEntry(lookup, {
+            pronunciationOnly: true,
+          });
           if (!ok || !entry?.pronunciations?.length || cancelled) {
             return;
           }
@@ -484,15 +512,7 @@ export function AppStateProvider({
               changed = true;
               return {
                 ...existing,
-                canonicalTerm: entry.canonicalTerm,
-                normalizedTerm: entry.normalizedTerm,
-                partOfSpeech: entry.partOfSpeech,
-                definition: entry.definition,
-                definitionLabels: entry.definitionLabels,
-                exampleSentence: entry.exampleSentence,
-                clozeSentence: entry.clozeSentence,
                 pronunciations: entry.pronunciations,
-                notes: entry.notes,
               };
             });
 
@@ -568,7 +588,7 @@ export function AppStateProvider({
               vocab: null,
               message:
                 message ??
-                "Dictionary lookup failed. Check your Merriam configuration.",
+                "Vocabulary generation failed. Check the server configuration.",
             };
           }
 
@@ -579,7 +599,7 @@ export function AppStateProvider({
             entry: null,
             vocab: null,
             message:
-              "Dictionary lookup failed. Check your network connection and Merriam configuration.",
+              "Vocabulary generation failed. Check your network connection and server configuration.",
           };
         }
 
@@ -588,7 +608,7 @@ export function AppStateProvider({
             outcome: "not_found",
             entry: null,
             vocab: null,
-            message: "No Merriam-Webster Learner's Dictionary match was found.",
+            message: "No reliable English vocabulary entry was found.",
           };
         }
 
@@ -609,13 +629,26 @@ export function AppStateProvider({
             const updated = {
               ...existing,
               originalQuery: query.trim(),
-              definition: entry.definition,
-              definitionLabels: entry.definitionLabels,
-              exampleSentence: entry.exampleSentence,
-              clozeSentence: entry.clozeSentence,
-              partOfSpeech: entry.partOfSpeech,
-              pronunciations: entry.pronunciations,
-              notes: entry.notes,
+              ...(!existing.contentEditedAt
+                ? {
+                    canonicalTerm: entry.canonicalTerm,
+                    normalizedTerm: entry.normalizedTerm,
+                    definition: entry.definition,
+                    definitionLabels: entry.definitionLabels,
+                    exampleSentence: entry.exampleSentence,
+                    clozeSentence: entry.clozeSentence,
+                    answerLemma: entry.answerLemma,
+                    clozeAnswer: entry.clozeAnswer,
+                    acceptedAnswers: entry.acceptedAnswers,
+                    partOfSpeech: entry.partOfSpeech,
+                    pronunciations: entry.pronunciations,
+                    notes: entry.notes,
+                    contentProvider: entry.contentProvider,
+                    contentModel: entry.contentModel,
+                    contentPromptVersion: entry.contentPromptVersion,
+                    contentGeneratedAt: entry.contentGeneratedAt,
+                  }
+                : {}),
               searchCount: existing.searchCount + 1,
               lastSearchedAt: nowIso,
             };
@@ -1022,10 +1055,19 @@ export function AppStateProvider({
       return { success: true };
     },
     async updateVocabBack(id, update) {
+      const answerLemma = update.answerLemma?.trim();
+      const clozeAnswer = update.clozeAnswer?.trim();
       const canonicalTerm = update.canonicalTerm?.trim();
       const clozeSentence = update.clozeSentence?.trim();
       const definition = update.definition.trim();
       const exampleSentence = update.exampleSentence.trim();
+      const acceptedAnswers = [
+        ...new Set(
+          (update.acceptedAnswers ?? [])
+            .map((answer) => answer.trim())
+            .filter(Boolean),
+        ),
+      ];
       const definitionLabels = normalizeDefinitionLabels(
         update.definitionLabels ?? [],
       );
@@ -1046,6 +1088,41 @@ export function AppStateProvider({
         };
       }
 
+      if (update.answerLemma !== undefined && !answerLemma) {
+        return {
+          success: false,
+          message: "Answer lemma is required.",
+        };
+      }
+
+      if (update.clozeAnswer !== undefined && !clozeAnswer) {
+        return {
+          success: false,
+          message: "Cloze answer is required.",
+        };
+      }
+
+      if (
+        update.acceptedAnswers !== undefined &&
+        acceptedAnswers.length === 0
+      ) {
+        return {
+          success: false,
+          message: "At least one accepted answer is required.",
+        };
+      }
+
+      if (
+        update.clozeSentence !== undefined &&
+        (!clozeSentence ||
+          clozeSentence.split(CLOZE_BLANK).length !== 2)
+      ) {
+        return {
+          success: false,
+          message: "Cloze sentence must contain exactly one _____ blank.",
+        };
+      }
+
       if (!definition) {
         return {
           success: false,
@@ -1058,27 +1135,47 @@ export function AppStateProvider({
           ...current,
           items: current.items.map((item) =>
             item.id === id
-              ? {
-                  ...item,
-                  canonicalTerm: canonicalTerm ?? item.canonicalTerm,
-                  normalizedTerm: normalizedTerm || item.normalizedTerm,
-                  definition,
-                  definitionLabels,
-                  clozeSentence:
-                    update.clozeSentence !== undefined
-                      ? clozeSentence || undefined
-                      : item.clozeSentence,
-                  exampleSentence:
-                    exampleSentence || "No example sentence available.",
-                  partOfSpeech:
-                    update.partOfSpeech !== undefined
-                      ? partOfSpeech || "unknown"
-                      : item.partOfSpeech,
-                  pronunciations:
-                    canonicalTerm && normalizedTerm !== item.normalizedTerm
-                      ? []
-                      : item.pronunciations,
-                }
+              ? (() => {
+                  const nextCanonicalTerm =
+                    canonicalTerm ?? item.canonicalTerm;
+                  const nextAnswerLemma =
+                    answerLemma ??
+                    (canonicalTerm ? canonicalTerm : item.answerLemma);
+
+                  return {
+                    ...item,
+                    canonicalTerm: nextCanonicalTerm,
+                    normalizedTerm: normalizedTerm || item.normalizedTerm,
+                    answerLemma: nextAnswerLemma,
+                    clozeAnswer:
+                      clozeAnswer ??
+                      (canonicalTerm ? canonicalTerm : item.clozeAnswer),
+                    acceptedAnswers:
+                      update.acceptedAnswers !== undefined
+                        ? acceptedAnswers
+                        : canonicalTerm
+                          ? [nextAnswerLemma]
+                          : item.acceptedAnswers,
+                    definition,
+                    definitionLabels,
+                    clozeSentence:
+                      update.clozeSentence !== undefined
+                        ? clozeSentence!
+                        : item.clozeSentence,
+                    exampleSentence:
+                      exampleSentence || "No example sentence available.",
+                    partOfSpeech:
+                      update.partOfSpeech !== undefined
+                        ? partOfSpeech || "unknown"
+                        : item.partOfSpeech,
+                    pronunciations:
+                      canonicalTerm && normalizedTerm !== item.normalizedTerm
+                        ? []
+                        : item.pronunciations,
+                    contentProvider: "manual",
+                    contentEditedAt: new Date().toISOString(),
+                  };
+                })()
               : item,
           ),
         }));
@@ -1092,7 +1189,12 @@ export function AppStateProvider({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            ...(update.acceptedAnswers !== undefined
+              ? { acceptedAnswers }
+              : {}),
+            answerLemma,
             canonicalTerm,
+            clozeAnswer,
             clozeSentence,
             definition,
             definitionLabels,

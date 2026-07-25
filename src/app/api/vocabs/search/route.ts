@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { type DictionaryEntry } from "@/lib/app-types";
-import { lookupMerriamEntry } from "@/lib/merriam";
 import {
   VOCAB_ROW_SELECT,
   attachReviewState,
@@ -16,17 +15,38 @@ import {
   fetchReviewHydrationForUser,
   fetchReviewStateForCard,
 } from "@/lib/supabase/review-data";
-import { enrichDictionaryEntry } from "@/lib/vocab-enrichment";
+import {
+  OPENAI_VOCAB_PROMPT_VERSION,
+} from "@/lib/vocab-enrichment";
+import { lookupVocabEntry } from "@/lib/vocab-lookup";
 import { isDue, NEW_WORD_DUE_CARD_LIMIT } from "@/lib/review";
 
-async function lookupEntry(query: string): Promise<DictionaryEntry | null> {
-  const apiKey = process.env.MERRIAM_API_KEY;
-  if (!apiKey) {
-    throw new Error("MERRIAM_API_KEY is not configured. Add it to .env.local.");
-  }
-
-  const entry = await lookupMerriamEntry(query, apiKey);
-  return entry ? enrichDictionaryEntry(entry) : null;
+function getPersistedContent(entry: DictionaryEntry) {
+  return {
+    canonical_term: entry.canonicalTerm,
+    normalized_term: entry.normalizedTerm,
+    definition: entry.definition,
+    definition_labels: entry.definitionLabels ?? [],
+    example_sentence: entry.exampleSentence,
+    cloze_sentence: entry.clozeSentence,
+    answer_lemma: entry.answerLemma,
+    cloze_answer: entry.clozeAnswer,
+    accepted_answers: entry.acceptedAnswers,
+    part_of_speech: entry.partOfSpeech,
+    pronunciations: entry.pronunciations ?? [],
+    notes: entry.notes ?? null,
+    dictionary_source: entry.contentProvider,
+    content_provider: entry.contentProvider,
+    content_model: entry.contentModel ?? null,
+    content_prompt_version: entry.contentPromptVersion ?? null,
+    content_generated_at: entry.contentGeneratedAt ?? null,
+    content_edited_at: null,
+    content_generation_attempt_version:
+      entry.contentPromptVersion ?? null,
+    content_generation_attempted_at:
+      entry.contentGeneratedAt ?? null,
+    content_generation_error: null,
+  };
 }
 
 async function buildReviewBackedVocab(
@@ -97,14 +117,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const entry = await lookupEntry(normalizedQuery);
+    const entry = await lookupVocabEntry(normalizedQuery);
     if (!entry) {
       return NextResponse.json(
         {
           outcome: "not_found",
           entry: null,
           vocab: null,
-          message: "No Merriam-Webster Learner's Dictionary match was found.",
+          message: "No reliable English vocabulary entry was found.",
           profile: mapProfileRowToState(profile),
         },
         { status: 404 },
@@ -134,19 +154,16 @@ export async function POST(request: Request) {
     const nowIso = new Date().toISOString();
 
     if (existing) {
+      const shouldRefreshGeneratedContent =
+        !existing.content_edited_at &&
+        entry.contentProvider === "openai" &&
+        (existing.content_provider !== "openai" ||
+          existing.content_prompt_version !== OPENAI_VOCAB_PROMPT_VERSION);
       const { data: updated, error: updateError } = await supabase
         .from("vocab_items")
         .update({
           original_query: originalQuery,
-          canonical_term: entry.canonicalTerm,
-          normalized_term: entry.normalizedTerm,
-          definition: entry.definition,
-          definition_labels: entry.definitionLabels ?? [],
-          example_sentence: entry.exampleSentence,
-          cloze_sentence: entry.clozeSentence ?? null,
-          part_of_speech: entry.partOfSpeech,
-          pronunciations: entry.pronunciations ?? [],
-          notes: entry.notes ?? null,
+          ...(shouldRefreshGeneratedContent ? getPersistedContent(entry) : {}),
           search_count: existing.search_count + 1,
           last_searched_at: nowIso,
         })
@@ -223,15 +240,7 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         original_query: originalQuery,
-        canonical_term: entry.canonicalTerm,
-        normalized_term: entry.normalizedTerm,
-        definition: entry.definition,
-        definition_labels: entry.definitionLabels ?? [],
-        example_sentence: entry.exampleSentence,
-        cloze_sentence: entry.clozeSentence ?? null,
-        part_of_speech: entry.partOfSpeech,
-        pronunciations: entry.pronunciations ?? [],
-        notes: entry.notes ?? null,
+        ...getPersistedContent(entry),
         status: "active",
         search_count: 1,
         last_searched_at: nowIso,
@@ -254,7 +263,10 @@ export async function POST(request: Request) {
       entry,
       reviewCards: reviewBackedVocab.reviewCards,
       vocab: reviewBackedVocab.vocab,
-      message: "Saved and synced to Supabase. Definition data came from Merriam-Webster.",
+      message:
+        entry.contentProvider === "openai"
+          ? "Generated with AI and synced to Supabase."
+          : "Saved from the dictionary fallback and synced to Supabase.",
       profile: mapProfileRowToState(profile),
     });
   } catch (error) {

@@ -42,8 +42,8 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 - frontend hosting: `Vercel`
 - auth + database: `Supabase`
-- learner dictionary: `Merriam-Webster Learner's Dictionary API`
-- optional AI enrichment: `OpenAI Responses API`
+- vocabulary content: `OpenAI Responses API`
+- pronunciation and content fallback: `Merriam-Webster Learner's Dictionary API`
 - billing: `Stripe`
 
 ## Next implementation step
@@ -73,4 +73,5 @@ See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the concrete Vercel + Supabase produc
 - In Supabase Auth URL configuration, set:
   - Site URL to your environment’s canonical domain
   - Additional redirect URLs for `http://localhost:3000/**` and your Vercel preview pattern
-- Keep `MERRIAM_API_KEY`, `OPENAI_API_KEY`, and Stripe secrets server-side only
+- Keep `OPENAI_API_KEY`, `MERRIAM_API_KEY`, and Stripe secrets server-side only
+- Use the signed-in Settings action once to regenerate legacy rows after deploying a new vocabulary prompt version

@@ -20,7 +20,10 @@ export function VocabLibrary() {
     restoreItem,
     updateVocabBack,
   } = useAppState();
+  const [editAcceptedAnswers, setEditAcceptedAnswers] = useState("");
+  const [editAnswerLemma, setEditAnswerLemma] = useState("");
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editClozeAnswer, setEditClozeAnswer] = useState("");
   const [editClozeSentence, setEditClozeSentence] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
   const [editDefinitionLabels, setEditDefinitionLabels] = useState("");
@@ -36,7 +39,10 @@ export function VocabLibrary() {
   function startEditing(item: VocabItem) {
     setEditMessage(null);
     setEditingItemId(item.id);
-    setEditClozeSentence(item.clozeSentence ?? "");
+    setEditAcceptedAnswers(item.acceptedAnswers.join(", "));
+    setEditAnswerLemma(item.answerLemma);
+    setEditClozeAnswer(item.clozeAnswer);
+    setEditClozeSentence(item.clozeSentence);
     setEditDefinition(item.definition);
     setEditDefinitionLabels(item.definitionLabels?.join(", ") ?? "");
     setEditExampleSentence(item.exampleSentence);
@@ -130,10 +136,16 @@ export function VocabLibrary() {
                         setIsSavingEdit(true);
                         try {
                           const result = await updateVocabBack(item.id, {
+                            acceptedAnswers: editAcceptedAnswers
+                              .split(",")
+                              .map((answer) => answer.trim())
+                              .filter(Boolean),
+                            answerLemma: editAnswerLemma,
                             canonicalTerm:
                               editTerm.trim() === item.canonicalTerm
                                 ? undefined
                                 : editTerm,
+                            clozeAnswer: editClozeAnswer,
                             clozeSentence: editClozeSentence,
                             definition: editDefinition,
                             definitionLabels:
@@ -180,6 +192,48 @@ export function VocabLibrary() {
                           />
                         </label>
                       </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className="block">
+                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                            Answer lemma
+                          </span>
+                          <input
+                            required
+                            value={editAnswerLemma}
+                            onChange={(event) =>
+                              setEditAnswerLemma(event.target.value)
+                            }
+                            className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                            Cloze answer
+                          </span>
+                          <input
+                            required
+                            value={editClozeAnswer}
+                            onChange={(event) =>
+                              setEditClozeAnswer(event.target.value)
+                            }
+                            className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                          />
+                        </label>
+                      </div>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Accepted lemma answers
+                        </span>
+                        <input
+                          required
+                          value={editAcceptedAnswers}
+                          onChange={(event) =>
+                            setEditAcceptedAnswers(event.target.value)
+                          }
+                          placeholder="color, colour"
+                          className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
                       <label className="block">
                         <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
                           Labels

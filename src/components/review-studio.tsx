@@ -62,12 +62,9 @@ function normalizeTypedAnswer(value: string) {
     .trim();
 }
 
-function getAcceptedTypedAnswers(canonicalTerm: string, normalizedTerm: string) {
-  const baseTerm = canonicalTerm.replace(/:\d+$/u, "");
-  const baseNormalizedTerm = normalizedTerm.replace(/:\d+$/u, "");
-
+function getAcceptedTypedAnswers(answerLemma: string, acceptedAnswers: string[]) {
   return new Set(
-    [canonicalTerm, baseTerm, normalizedTerm, baseNormalizedTerm]
+    [answerLemma, ...acceptedAnswers]
       .map(normalizeTypedAnswer)
       .filter(Boolean),
   );
@@ -85,7 +82,10 @@ function removeTypedAnswer(
 export function ReviewStudio() {
   const { answerCard, dueItems, reviewsToday, updateVocabBack } = useAppState();
   const [deferredAgainIds, setDeferredAgainIds] = useState<string[]>([]);
+  const [editAcceptedAnswers, setEditAcceptedAnswers] = useState("");
+  const [editAnswerLemma, setEditAnswerLemma] = useState("");
   const [backEditMessage, setBackEditMessage] = useState<string | null>(null);
+  const [editClozeAnswer, setEditClozeAnswer] = useState("");
   const [editingBackCardId, setEditingBackCardId] = useState<string | null>(null);
   const [editClozeSentence, setEditClozeSentence] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
@@ -181,14 +181,17 @@ export function ReviewStudio() {
     }
 
     const acceptedAnswers = getAcceptedTypedAnswers(
-      current.canonicalTerm,
-      current.normalizedTerm,
+      current.answerLemma,
+      current.acceptedAnswers,
     );
     if (!acceptedAnswers.has(normalizedAnswer)) {
       setRevealedCardId(currentCardId);
       setSessionFeedback({
         message:
-          "Not quite. The correct spelling is shown below; self-grade this card.",
+          normalizedAnswer === normalizeTypedAnswer(current.clozeAnswer) &&
+          normalizedAnswer !== normalizeTypedAnswer(current.answerLemma)
+            ? `Correct word, but that is the sentence form. Reverse recall expects the lemma “${current.answerLemma}”.`
+            : "Not quite. The correct lemma is shown below; self-grade this card.",
         tone: "error",
       });
       return;
@@ -296,7 +299,7 @@ export function ReviewStudio() {
               </p>
               <label className="block">
                 <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
-                  Type the word
+                  Type the dictionary form
                 </span>
                 <input
                   key={currentCardId}
@@ -352,7 +355,12 @@ export function ReviewStudio() {
                       onClick={() => {
                         setBackEditMessage(null);
                         setEditingBackCardId(current.id);
-                        setEditClozeSentence(current.clozeSentence ?? "");
+                        setEditAcceptedAnswers(
+                          current.acceptedAnswers.join(", "),
+                        );
+                        setEditAnswerLemma(current.answerLemma);
+                        setEditClozeAnswer(current.clozeAnswer);
+                        setEditClozeSentence(current.clozeSentence);
                         setEditDefinition(current.definition);
                         setEditDefinitionLabels(
                           current.definitionLabels?.join(", ") ?? "",
@@ -375,6 +383,12 @@ export function ReviewStudio() {
                       setIsSavingBack(true);
                       try {
                         const result = await updateVocabBack(current.id, {
+                          acceptedAnswers: editAcceptedAnswers
+                            .split(",")
+                            .map((answer) => answer.trim())
+                            .filter(Boolean),
+                          answerLemma: editAnswerLemma,
+                          clozeAnswer: editClozeAnswer,
                           clozeSentence: editClozeSentence,
                           definition: editDefinition,
                           definitionLabels:
@@ -395,6 +409,48 @@ export function ReviewStudio() {
                       }
                     }}
                   >
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Answer lemma
+                        </span>
+                        <input
+                          required
+                          value={editAnswerLemma}
+                          onChange={(event) =>
+                            setEditAnswerLemma(event.target.value)
+                          }
+                          className="mt-1.5 h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                          Cloze answer
+                        </span>
+                        <input
+                          required
+                          value={editClozeAnswer}
+                          onChange={(event) =>
+                            setEditClozeAnswer(event.target.value)
+                          }
+                          className="mt-1.5 h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                        />
+                      </label>
+                    </div>
+                    <label className="block">
+                      <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
+                        Accepted lemma answers
+                      </span>
+                      <input
+                        required
+                        value={editAcceptedAnswers}
+                        onChange={(event) =>
+                          setEditAcceptedAnswers(event.target.value)
+                        }
+                        placeholder="color, colour"
+                        className="mt-1.5 h-10 w-full rounded-xl border border-[color:var(--color-border)] bg-white px-3 text-sm text-[color:var(--color-foreground)] outline-none focus:border-[color:var(--color-accent)]"
+                      />
+                    </label>
                     <label className="block">
                       <span className="text-xs font-medium uppercase tracking-[0.18em] text-[color:var(--color-muted)]">
                         Labels
@@ -480,7 +536,7 @@ export function ReviewStudio() {
                         Correct spelling
                       </p>
                       <h2 className="text-3xl font-semibold text-[color:var(--color-foreground)]">
-                        {current.canonicalTerm}
+                        {current.answerLemma}
                       </h2>
                       <p className="text-sm text-[color:var(--color-muted)]">
                         {current.partOfSpeech}

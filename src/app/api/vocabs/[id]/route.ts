@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeDefinitionLabels } from "@/lib/definition-labels";
+import { CLOZE_BLANK } from "@/lib/cloze";
 import {
   VOCAB_ROW_SELECT,
   mapVocabRowToPersistedItem,
@@ -20,19 +21,35 @@ export async function PATCH(
 
     const { id } = await params;
     const body = (await request.json()) as {
+      acceptedAnswers?: unknown;
+      answerLemma?: string;
       canonicalTerm?: string;
+      clozeAnswer?: string;
       clozeSentence?: string;
       definition?: string;
       definitionLabels?: unknown;
       exampleSentence?: string;
       partOfSpeech?: string;
     };
+    const answerLemma = body.answerLemma?.trim();
     const canonicalTerm = body.canonicalTerm?.trim();
+    const clozeAnswer = body.clozeAnswer?.trim();
     const clozeSentence = body.clozeSentence?.trim();
     const definition = body.definition?.trim() ?? "";
     const exampleSentence = body.exampleSentence?.trim() ?? "";
     const normalizedTerm = canonicalTerm ? normalizeQuery(canonicalTerm) : "";
     const partOfSpeech = body.partOfSpeech?.trim();
+    const acceptedAnswers = Array.isArray(body.acceptedAnswers)
+      ? [
+          ...new Set(
+            body.acceptedAnswers.flatMap((answer) =>
+              typeof answer === "string" && answer.trim()
+                ? [answer.trim()]
+                : [],
+            ),
+          ),
+        ]
+      : [];
 
     if (body.canonicalTerm !== undefined && !canonicalTerm) {
       return NextResponse.json(
@@ -44,6 +61,41 @@ export async function PATCH(
     if (canonicalTerm && !normalizedTerm) {
       return NextResponse.json(
         { message: "Word needs at least one letter or number." },
+        { status: 400 },
+      );
+    }
+
+    if (body.answerLemma !== undefined && !answerLemma) {
+      return NextResponse.json(
+        { message: "Answer lemma is required." },
+        { status: 400 },
+      );
+    }
+
+    if (body.clozeAnswer !== undefined && !clozeAnswer) {
+      return NextResponse.json(
+        { message: "Cloze answer is required." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      body.acceptedAnswers !== undefined &&
+      acceptedAnswers.length === 0
+    ) {
+      return NextResponse.json(
+        { message: "At least one accepted answer is required." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      body.clozeSentence !== undefined &&
+      (!clozeSentence ||
+        clozeSentence.split(CLOZE_BLANK).length !== 2)
+    ) {
+      return NextResponse.json(
+        { message: "Cloze sentence must contain exactly one _____ blank." },
         { status: 400 },
       );
     }
@@ -65,6 +117,17 @@ export async function PATCH(
               pronunciations: [],
             }
           : {}),
+        ...(answerLemma || canonicalTerm
+          ? { answer_lemma: answerLemma ?? canonicalTerm }
+          : {}),
+        ...(clozeAnswer || canonicalTerm
+          ? { cloze_answer: clozeAnswer ?? canonicalTerm }
+          : {}),
+        ...(body.acceptedAnswers !== undefined
+          ? { accepted_answers: acceptedAnswers }
+          : answerLemma || canonicalTerm
+            ? { accepted_answers: [answerLemma ?? canonicalTerm] }
+            : {}),
         definition,
         definition_labels: normalizeDefinitionLabels(body.definitionLabels),
         ...(body.clozeSentence !== undefined
@@ -74,6 +137,9 @@ export async function PATCH(
         ...(body.partOfSpeech !== undefined
           ? { part_of_speech: partOfSpeech || null }
           : {}),
+        content_provider: "manual",
+        content_edited_at: new Date().toISOString(),
+        content_generation_error: null,
       })
       .eq("id", id)
       .select(VOCAB_ROW_SELECT)

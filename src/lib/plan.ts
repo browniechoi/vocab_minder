@@ -21,11 +21,18 @@ export const CLOUD_SERVICES = [
       "Fastest path to shipping the App Router frontend. Move to Pro once the app is public or commercial.",
   },
   {
+    name: "OpenAI API",
+    role: "Definitions, examples, lemmas, and cloze answers",
+    v0Cost: "Usage based",
+    reason:
+      "Structured generation produces practical learner context once, then Supabase stores it for deterministic reviews.",
+  },
+  {
     name: "Merriam-Webster Learner's API",
-    role: "Reliable learner-oriented dictionary data",
+    role: "Pronunciation audio and content fallback",
     v0Cost: "$0 for non-commercial usage under the documented limit",
     reason:
-      "Better fit than generic dictionary APIs because it is explicitly learner-focused and supports example-rich entries.",
+      "Retained for authoritative pronunciation data and graceful fallback when AI generation is unavailable.",
   },
   {
     name: "Stripe",
@@ -56,7 +63,15 @@ export const ENV_CHECKLIST = [
   },
   {
     name: "MERRIAM_API_KEY",
-    purpose: "Server-side dictionary lookup key. Never expose this in the browser.",
+    purpose: "Optional pronunciation and fallback lookup key.",
+  },
+  {
+    name: "OPENAI_API_KEY",
+    purpose: "Server-side AI vocabulary generation key. Never expose this in the browser.",
+  },
+  {
+    name: "OPENAI_VOCAB_MODEL",
+    purpose: "OpenAI model used for structured vocabulary generation.",
   },
   {
     name: "STRIPE_SECRET_KEY",
