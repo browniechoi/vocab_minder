@@ -16,7 +16,6 @@ export function SettingsPanel() {
   const [regenerationMessage, setRegenerationMessage] = useState<string | null>(
     null,
   );
-  const [regenerationFailures, setRegenerationFailures] = useState(0);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   async function regenerateVocabulary(retryFailed = false) {
@@ -31,7 +30,6 @@ export function SettingsPanel() {
 
     setIsRegenerating(true);
     setRegenerationMessage("Regenerating vocabulary in small batches...");
-    setRegenerationFailures(0);
 
     let regenerated = 0;
     let failed = 0;
@@ -85,7 +83,6 @@ export function SettingsPanel() {
         }
       }
 
-      setRegenerationFailures(failed);
       setRegenerationMessage(
         `Regeneration complete: ${regenerated} updated${
           failed ? `, ${failed} failed` : ""
@@ -180,13 +177,13 @@ export function SettingsPanel() {
                 >
                   {isRegenerating ? "Regenerating..." : "Regenerate with AI"}
                 </button>
-                {regenerationFailures > 0 && !isRegenerating ? (
+                {!isRegenerating ? (
                   <button
                     type="button"
                     onClick={() => void regenerateVocabulary(true)}
                     className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)]"
                   >
-                    Retry failures
+                    Retry failed rows
                   </button>
                 ) : null}
                 {regenerationMessage?.includes("Reload") ? (
