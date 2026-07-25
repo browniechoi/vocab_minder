@@ -21,11 +21,11 @@ export const CLOUD_SERVICES = [
       "Fastest path to shipping the App Router frontend. Move to Pro once the app is public or commercial.",
   },
   {
-    name: "OpenAI API",
+    name: "Gemini API",
     role: "Definitions, examples, lemmas, and cloze answers",
-    v0Cost: "Usage based",
+    v0Cost: "$0 within the Gemini developer free tier",
     reason:
-      "Structured generation produces practical learner context once, then Supabase stores it for deterministic reviews.",
+      "Structured generation produces practical learner context once, then Supabase stores it for deterministic reviews. The provider adapter keeps OpenAI available as an alternative.",
   },
   {
     name: "Merriam-Webster Learner's API",
@@ -66,8 +66,23 @@ export const ENV_CHECKLIST = [
     purpose: "Optional pronunciation and fallback lookup key.",
   },
   {
+    name: "VOCAB_AI_PROVIDER",
+    purpose: 'Selects the server-side generator: "gemini" or "openai".',
+  },
+  {
+    name: "GEMINI_API_KEY",
+    purpose:
+      "Server-side Gemini vocabulary generation key. Never expose this in the browser.",
+  },
+  {
+    name: "GEMINI_VOCAB_MODEL",
+    purpose:
+      "Gemini model used for structured vocabulary generation. Defaults to gemini-3.5-flash.",
+  },
+  {
     name: "OPENAI_API_KEY",
-    purpose: "Server-side AI vocabulary generation key. Never expose this in the browser.",
+    purpose:
+      "Optional server-side key when VOCAB_AI_PROVIDER is set to OpenAI.",
   },
   {
     name: "OPENAI_VOCAB_MODEL",

@@ -16,7 +16,8 @@ import {
   fetchReviewStateForCard,
 } from "@/lib/supabase/review-data";
 import {
-  OPENAI_VOCAB_PROMPT_VERSION,
+  AI_VOCAB_PROMPT_VERSION,
+  getContentGenerationAttemptVersion,
 } from "@/lib/vocab-enrichment";
 import { lookupVocabEntry } from "@/lib/vocab-lookup";
 import { isDue, NEW_WORD_DUE_CARD_LIMIT } from "@/lib/review";
@@ -47,7 +48,7 @@ function getPersistedContent(entry: DictionaryEntry) {
     content_generated_at: entry.contentGeneratedAt ?? null,
     content_edited_at: null,
     content_generation_attempt_version:
-      entry.contentPromptVersion ?? null,
+      getContentGenerationAttemptVersion(entry),
     content_generation_attempted_at:
       entry.contentGeneratedAt ?? null,
     content_generation_error: null,
@@ -159,11 +160,14 @@ export async function POST(request: Request) {
     const nowIso = new Date().toISOString();
 
     if (existing) {
+      const generatedByAi =
+        entry.contentProvider === "gemini" ||
+        entry.contentProvider === "openai";
       const shouldRefreshGeneratedContent =
         !existing.content_edited_at &&
-        entry.contentProvider === "openai" &&
-        (existing.content_provider !== "openai" ||
-          existing.content_prompt_version !== OPENAI_VOCAB_PROMPT_VERSION);
+        generatedByAi &&
+        (existing.content_provider !== entry.contentProvider ||
+          existing.content_prompt_version !== AI_VOCAB_PROMPT_VERSION);
       const { data: updated, error: updateError } = await supabase
         .from("vocab_items")
         .update({
@@ -269,6 +273,7 @@ export async function POST(request: Request) {
       reviewCards: reviewBackedVocab.reviewCards,
       vocab: reviewBackedVocab.vocab,
       message:
+        entry.contentProvider === "gemini" ||
         entry.contentProvider === "openai"
           ? "Generated with AI and synced to Supabase."
           : "Saved from the dictionary fallback and synced to Supabase.",

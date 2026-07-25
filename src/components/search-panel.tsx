@@ -178,8 +178,8 @@ export function SearchPanel() {
           ) : (
             <div className="rounded-[24px] border border-dashed border-[color:var(--color-border)] px-5 py-5 text-sm leading-7 text-[color:var(--color-muted)]">
               {remotePersistenceEnabled
-                ? "Search now calls Merriam-Webster through the app server and writes successful hits into your Supabase-backed vocab library."
-                : "Search now calls Merriam-Webster through the app server. Sign in when you want the vocab library to sync to Supabase instead of staying local."}
+                ? "Search generates learner-focused content through the app server, adds Merriam-Webster pronunciation when available, and syncs successful results to Supabase."
+                : "Search generates learner-focused content through the app server. Sign in when you want the vocab library to sync to Supabase instead of staying local."}
             </div>
           )}
         </div>

@@ -4,7 +4,7 @@ This app should be deployed as:
 
 - frontend/app server: `Vercel`
 - auth + database: `Supabase`
-- vocabulary content: `OpenAI Responses API`
+- vocabulary content: `Gemini API` by default, with an `OpenAI` adapter available
 - pronunciation and content fallback: `Merriam-Webster Learner's Dictionary API`
 
 For your current hosted backend, the Supabase project ref is:
@@ -44,13 +44,15 @@ In the Vercel project, set these environment variables.
 
 Required for all environments:
 
-- `OPENAI_API_KEY`
+- `VOCAB_AI_PROVIDER`
+- `GEMINI_API_KEY`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
 Optional:
 
-- `OPENAI_VOCAB_MODEL` defaults to `gpt-4.1-mini` when unset
+- `GEMINI_VOCAB_MODEL` defaults to `gemini-3.5-flash` when unset
+- `OPENAI_API_KEY` and `OPENAI_VOCAB_MODEL` are only needed when `VOCAB_AI_PROVIDER=openai`
 - `MERRIAM_API_KEY` enables Merriam-Webster pronunciation and dictionary fallback
 
 Required for production:
@@ -142,7 +144,9 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=https://yikdonnnuggljrayzqup.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<from-supabase-dashboard>
 MERRIAM_API_KEY=<your-merriam-key>
-OPENAI_API_KEY=<your-openai-api-key>
+VOCAB_AI_PROVIDER=gemini
+GEMINI_API_KEY=<your-gemini-api-key>
+GEMINI_VOCAB_MODEL=gemini-3.5-flash
 ```
 
 Then run:

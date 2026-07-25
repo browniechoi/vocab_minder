@@ -24,7 +24,11 @@ export type Pronunciation = {
   source: "merriam";
 };
 
-export type VocabContentProvider = "manual" | "merriam_webster" | "openai";
+export type VocabContentProvider =
+  | "gemini"
+  | "manual"
+  | "merriam_webster"
+  | "openai";
 
 export type DictionaryEntry = {
   canonicalTerm: string;

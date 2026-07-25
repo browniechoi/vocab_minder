@@ -136,7 +136,7 @@ function normalizeStoredStrings(value: unknown, fallback: string[] = []) {
 }
 
 function normalizeContentProvider(value: unknown): VocabContentProvider {
-  return value === "openai" || value === "manual"
+  return value === "gemini" || value === "openai" || value === "manual"
     ? value
     : "merriam_webster";
 }

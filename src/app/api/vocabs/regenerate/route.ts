@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
 import {
+  AI_VOCAB_PROMPT_VERSION,
   generateVocabEntry,
-  OPENAI_VOCAB_PROMPT_VERSION,
+  getVocabGenerationTarget,
 } from "@/lib/vocab-enrichment";
 
 const REGENERATION_BATCH_SIZE = 3;
@@ -20,9 +21,17 @@ export async function POST(request: Request) {
       return errorResponse;
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    let generationTarget;
+    try {
+      generationTarget = getVocabGenerationTarget();
+    } catch (error) {
       return NextResponse.json(
-        { message: "OPENAI_API_KEY is not configured on the server." },
+        {
+          message:
+            error instanceof Error
+              ? error.message
+              : "AI vocabulary generation is not configured on the server.",
+        },
         { status: 503 },
       );
     }
@@ -55,10 +64,10 @@ export async function POST(request: Request) {
       .order("id", { ascending: true })
       .limit(REGENERATION_BATCH_SIZE)
       .or(
-        `content_provider.neq.openai,content_prompt_version.is.null,content_prompt_version.neq.${OPENAI_VOCAB_PROMPT_VERSION}`,
+        `content_provider.neq.${generationTarget.provider},content_model.is.null,content_model.neq.${generationTarget.model},content_prompt_version.is.null,content_prompt_version.neq.${AI_VOCAB_PROMPT_VERSION}`,
       )
       .or(
-        `content_generation_attempt_version.is.null,content_generation_attempt_version.neq.${OPENAI_VOCAB_PROMPT_VERSION}`,
+        `content_generation_attempt_version.is.null,content_generation_attempt_version.neq.${generationTarget.attemptVersion}`,
       );
 
     const { data: rows, error: rowsError } =
@@ -101,14 +110,15 @@ export async function POST(request: Request) {
               sense_key: generated.senseKey,
               part_of_speech: generated.partOfSpeech,
               notes: generated.notes ?? null,
-              dictionary_source: "openai",
-              content_provider: "openai",
+              dictionary_source: generated.contentProvider,
+              content_provider: generated.contentProvider,
               content_model: generated.contentModel ?? null,
-              content_prompt_version: OPENAI_VOCAB_PROMPT_VERSION,
+              content_prompt_version:
+                generated.contentPromptVersion ?? AI_VOCAB_PROMPT_VERSION,
               content_generated_at: generated.contentGeneratedAt ?? attemptedAt,
               content_edited_at: null,
               content_generation_attempt_version:
-                OPENAI_VOCAB_PROMPT_VERSION,
+                generationTarget.attemptVersion,
               content_generation_attempted_at: attemptedAt,
               content_generation_error: null,
             })
@@ -129,7 +139,7 @@ export async function POST(request: Request) {
             .from("vocab_items")
             .update({
               content_generation_attempt_version:
-                OPENAI_VOCAB_PROMPT_VERSION,
+                generationTarget.attemptVersion,
               content_generation_attempted_at: attemptedAt,
               content_generation_error: message,
             })
