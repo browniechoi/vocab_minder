@@ -6,7 +6,8 @@ import {
   getVocabGenerationTarget,
 } from "@/lib/vocab-enrichment";
 
-const REGENERATION_BATCH_SIZE = 3;
+const REGENERATION_BATCH_SIZE = 2;
+const REGENERATION_BATCH_DELAY_MS = 5_000;
 
 type RegenerationRow = {
   canonical_term: string;
@@ -159,6 +160,7 @@ export async function POST(request: Request) {
       attempted: results.length,
       failed: results.filter((result) => !result.success),
       hasMore: results.length === REGENERATION_BATCH_SIZE,
+      nextBatchDelayMs: REGENERATION_BATCH_DELAY_MS,
       regenerated: results.filter((result) => result.success).length,
     });
   } catch (error) {

@@ -61,6 +61,7 @@ export function SettingsPanel() {
           failed?: unknown[];
           hasMore?: boolean;
           message?: string;
+          nextBatchDelayMs?: number;
           regenerated?: number;
         };
 
@@ -77,6 +78,11 @@ export function SettingsPanel() {
             failed ? `; ${failed} need retry` : ""
           }...`,
         );
+        if (hasMore && payload.nextBatchDelayMs) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, payload.nextBatchDelayMs),
+          );
+        }
       }
 
       setRegenerationFailures(failed);
@@ -162,8 +168,8 @@ export function SettingsPanel() {
               </p>
               <p className="mt-2 text-sm leading-6 text-[color:var(--color-muted)]">
                 Regenerate form-specific definitions, examples, roles, usage,
-                collocations, lemmas, and cloze answers. Review schedules and
-                history are not changed.
+                collocations, lemmas, and cloze answers in free-tier-safe
+                batches. Review schedules and history are not changed.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
