@@ -76,4 +76,3 @@ See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the concrete Vercel + Supabase produc
   - Site URL to your environment’s canonical domain
   - Additional redirect URLs for `http://localhost:3000/**` and your Vercel preview pattern
 - Keep `GEMINI_API_KEY`, `OPENAI_API_KEY`, `MERRIAM_API_KEY`, and Stripe secrets server-side only
-- Use the signed-in Settings action once to regenerate legacy rows after deploying a new vocabulary prompt version

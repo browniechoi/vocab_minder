@@ -18,7 +18,11 @@ const outcomeStyles: Record<SearchOutcome, string> = {
     "border-[color:var(--color-warning)] bg-[rgba(179,122,42,0.1)] text-[color:var(--color-foreground)]",
   review_load_high:
     "border-[color:var(--color-warning)] bg-[rgba(179,122,42,0.1)] text-[color:var(--color-foreground)]",
+  suggestion:
+    "border-[color:var(--color-warning)] bg-[rgba(179,122,42,0.1)] text-[color:var(--color-foreground)]",
   not_found:
+    "border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] text-[color:var(--color-foreground)]",
+  invalid_query:
     "border-[color:var(--color-danger)] bg-[rgba(187,79,59,0.08)] text-[color:var(--color-foreground)]",
   empty_query:
     "border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-muted)]",
@@ -46,6 +50,15 @@ export function SearchPanel() {
     Math.round((activeCount / state.activeLimit) * 100),
   );
 
+  async function runSearch(nextQuery: string) {
+    setIsSearching(true);
+    try {
+      setLastResult(await search(nextQuery));
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="soft-panel rounded-[32px] px-6 py-6 sm:px-7">
@@ -68,12 +81,7 @@ export function SearchPanel() {
             className="grid gap-3 sm:grid-cols-[1fr_auto]"
             onSubmit={async (event) => {
               event.preventDefault();
-              setIsSearching(true);
-              try {
-                setLastResult(await search(query));
-              } finally {
-                setIsSearching(false);
-              }
+              await runSearch(query);
             }}
           >
             <label className="sr-only" htmlFor="search">
@@ -118,6 +126,24 @@ export function SearchPanel() {
                 {lastResult.outcome.replaceAll("_", " ")}
               </p>
               <p className="mt-3 text-sm leading-7">{lastResult.message}</p>
+              {lastResult.suggestions?.length ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {lastResult.suggestions.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      disabled={isSearching}
+                      onClick={() => {
+                        setQuery(suggestion);
+                        void runSearch(suggestion);
+                      }}
+                      className="rounded-full border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {lastResult.entry ? (
                 <div className="mt-4 rounded-[20px] border border-black/5 bg-white/70 px-4 py-4">
                   <div className="flex items-center justify-between gap-3">

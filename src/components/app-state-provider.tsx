@@ -35,18 +35,21 @@ import {
   normalizeReviewState,
   shouldUnlockProduction,
 } from "@/lib/review";
+import { validateVocabQuery } from "@/lib/vocab-query";
 
 type SearchResult = {
   outcome: SearchOutcome;
   entry: DictionaryEntry | null;
   vocab: VocabItem | null;
   message: string;
+  suggestions?: string[];
 };
 
 type DictionaryLookupResponse = {
   entry: DictionaryEntry | null;
   message: string | null;
   ok: boolean;
+  suggestions: string[];
 };
 
 type BootstrapResponse = {
@@ -63,6 +66,7 @@ type RemoteSearchResponse = {
   vocab: VocabItem | null;
   message: string;
   profile: ProfileState;
+  suggestions?: string[];
 };
 
 type RemotePlanResponse = {
@@ -365,12 +369,14 @@ async function lookupDictionaryEntry(
   const payload = (await response.json()) as {
     entry: DictionaryEntry | null;
     message?: string | null;
+    suggestions?: string[];
   };
 
   return {
     entry: payload.entry,
     message: payload.message ?? null,
     ok: response.ok,
+    suggestions: payload.suggestions ?? [],
   };
 }
 
@@ -573,21 +579,22 @@ export function AppStateProvider({
     reviewsToday,
     remotePersistenceEnabled,
     async search(query) {
-      const normalizedQuery = normalizeQuery(query);
-      if (!normalizedQuery) {
+      const validation = validateVocabQuery(query);
+      if (validation.message) {
         return {
-          outcome: "empty_query",
+          outcome: query.trim() ? "invalid_query" : "empty_query",
           entry: null,
           vocab: null,
-          message: "Type a word or short phrase before searching.",
+          message: validation.message,
         };
       }
+      const normalizedQuery = validation.normalizedQuery;
 
       if (!remotePersistenceEnabled) {
         let entry: DictionaryEntry | null = null;
 
         try {
-          const { entry: lookupEntry, message, ok } =
+          const { entry: lookupEntry, message, ok, suggestions } =
             await lookupDictionaryEntry(normalizedQuery);
 
           if (!ok) {
@@ -602,6 +609,15 @@ export function AppStateProvider({
           }
 
           entry = lookupEntry;
+          if (!entry && suggestions.length > 0) {
+            return {
+              outcome: "suggestion",
+              entry: null,
+              vocab: null,
+              message: "No exact match. Did you mean one of these?",
+              suggestions,
+            };
+          }
         } catch {
           return {
             outcome: "not_found",
@@ -789,6 +805,7 @@ export function AppStateProvider({
           entry: remotePayload.entry,
           vocab: remotePayload.vocab,
           message: remotePayload.message,
+          suggestions: remotePayload.suggestions,
         };
       } catch {
         return {

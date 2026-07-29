@@ -14,7 +14,9 @@ export type SearchOutcome =
   | "existing_archived"
   | "limit_reached"
   | "review_load_high"
+  | "suggestion"
   | "not_found"
+  | "invalid_query"
   | "empty_query";
 
 export type Pronunciation = {

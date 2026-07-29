@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
 import { CLOUD_SERVICES, ENV_CHECKLIST, PLAN_LIMITS } from "@/lib/plan";
 import { LOCAL_STORAGE_KEY } from "@/lib/preview-config";
@@ -13,92 +12,6 @@ export function SettingsPanel() {
     setPlanTier,
     state,
   } = useAppState();
-  const [regenerationMessage, setRegenerationMessage] = useState<string | null>(
-    null,
-  );
-  const [isRegenerating, setIsRegenerating] = useState(false);
-
-  async function regenerateVocabulary(retryFailed = false) {
-    if (
-      !retryFailed &&
-      !window.confirm(
-        "Regenerate all existing vocabulary definitions and examples with AI? Review schedules and history will be preserved.",
-      )
-    ) {
-      return;
-    }
-
-    setIsRegenerating(true);
-    setRegenerationMessage("Regenerating vocabulary at a free-tier-safe pace...");
-
-    let regenerated = 0;
-    let failed = 0;
-    let hasMore = true;
-    let firstRequest = true;
-    let batchCount = 0;
-
-    try {
-      while (hasMore) {
-        batchCount += 1;
-        if (batchCount > 200) {
-          throw new Error(
-            "Regeneration stopped after 200 batches. Retry after checking server logs.",
-          );
-        }
-
-        const response = await fetch("/api/vocabs/regenerate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            retryFailed: retryFailed && firstRequest,
-          }),
-        });
-        const payload = (await response.json()) as {
-          failed?: unknown[];
-          hasMore?: boolean;
-          message?: string;
-          nextBatchDelayMs?: number;
-          regenerated?: number;
-        };
-
-        if (!response.ok) {
-          throw new Error(payload.message ?? "Vocabulary regeneration failed.");
-        }
-
-        regenerated += payload.regenerated ?? 0;
-        failed += payload.failed?.length ?? 0;
-        hasMore = Boolean(payload.hasMore);
-        firstRequest = false;
-        setRegenerationMessage(
-          `Regenerated ${regenerated} vocabularies${
-            failed ? `; ${failed} need retry` : ""
-          }...`,
-        );
-        if (hasMore && payload.nextBatchDelayMs) {
-          await new Promise((resolve) =>
-            window.setTimeout(resolve, payload.nextBatchDelayMs),
-          );
-        }
-      }
-
-      setRegenerationMessage(
-        `Regeneration complete: ${regenerated} updated${
-          failed ? `, ${failed} failed` : ""
-        }. Reload to use the new content.`,
-      );
-    } catch (error) {
-      setRegenerationMessage(
-        error instanceof Error
-          ? error.message
-          : "Vocabulary regeneration failed.",
-      );
-    } finally {
-      setIsRegenerating(false);
-    }
-  }
-
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
       <div className="grid gap-6">
@@ -158,51 +71,6 @@ export function SettingsPanel() {
               : "Reset preview data"}
           </button>
 
-          {remotePersistenceEnabled ? (
-            <div className="mt-6 rounded-[24px] border border-[color:var(--color-border)] bg-white px-5 py-5">
-              <p className="text-sm font-medium text-[color:var(--color-foreground)]">
-                AI vocabulary content
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--color-muted)]">
-                Regenerate form-specific definitions, examples, roles, usage,
-                collocations, lemmas, and cloze answers at a free-tier-safe
-                pace. Review schedules and history are not changed.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={isRegenerating}
-                  onClick={() => void regenerateVocabulary(false)}
-                  className="rounded-full bg-[color:var(--color-foreground)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isRegenerating ? "Regenerating..." : "Regenerate with AI"}
-                </button>
-                {!isRegenerating ? (
-                  <button
-                    type="button"
-                    onClick={() => void regenerateVocabulary(true)}
-                    className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)]"
-                  >
-                    Retry failed rows
-                  </button>
-                ) : null}
-                {regenerationMessage?.includes("Reload") ? (
-                  <button
-                    type="button"
-                    onClick={() => window.location.reload()}
-                    className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)]"
-                  >
-                    Reload
-                  </button>
-                ) : null}
-              </div>
-              {regenerationMessage ? (
-                <p className="mt-3 text-sm leading-6 text-[color:var(--color-muted)]">
-                  {regenerationMessage}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
         </div>
 
         <div className="soft-panel rounded-[32px] px-6 py-6">

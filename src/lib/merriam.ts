@@ -202,6 +202,29 @@ function isMerriamEntry(value: unknown): value is MerriamEntry {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+export function getMerriamSuggestions(payload: unknown) {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      payload.flatMap((item) => {
+        if (typeof item !== "string") {
+          return [];
+        }
+
+        const suggestion = cleanMerriamText(item).toLowerCase();
+        return suggestion &&
+          suggestion.length <= 80 &&
+          /[a-z]/u.test(suggestion)
+          ? [suggestion]
+          : [];
+      }),
+    ),
+  ].slice(0, 5);
+}
+
 export function toDictionaryEntry(
   payload: unknown,
   query?: string,
@@ -263,7 +286,7 @@ export function toDictionaryEntry(
   };
 }
 
-export async function lookupMerriamEntry(query: string, apiKey: string) {
+export async function lookupMerriam(query: string, apiKey: string) {
   const endpoint = new URL(
     `https://www.dictionaryapi.com/api/v3/references/learners/json/${encodeURIComponent(query)}`,
   );
@@ -280,5 +303,13 @@ export async function lookupMerriamEntry(query: string, apiKey: string) {
     throw new Error(`Merriam lookup failed with status ${response.status}.`);
   }
 
-  return toDictionaryEntry((await response.json()) as unknown, query);
+  const payload = (await response.json()) as unknown;
+  return {
+    entry: toDictionaryEntry(payload, query),
+    suggestions: getMerriamSuggestions(payload),
+  };
+}
+
+export async function lookupMerriamEntry(query: string, apiKey: string) {
+  return (await lookupMerriam(query, apiKey)).entry;
 }

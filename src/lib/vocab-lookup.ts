@@ -1,31 +1,49 @@
 import type { DictionaryEntry } from "@/lib/app-types";
-import { lookupMerriamEntry } from "@/lib/merriam";
+import { lookupMerriam } from "@/lib/merriam";
 import { generateVocabEntry } from "@/lib/vocab-enrichment";
 
-export async function lookupVocabEntry(
-  query: string,
-): Promise<DictionaryEntry | null> {
+export type VocabLookupResult = {
+  entry: DictionaryEntry | null;
+  suggestions: string[];
+};
+
+export async function lookupVocab(query: string): Promise<VocabLookupResult> {
   const merriamApiKey = process.env.MERRIAM_API_KEY;
   const [generatedResult, merriamResult] = await Promise.allSettled([
     generateVocabEntry(query),
     merriamApiKey
-      ? lookupMerriamEntry(query, merriamApiKey)
-      : Promise.resolve(null),
+      ? lookupMerriam(query, merriamApiKey)
+      : Promise.resolve({ entry: null, suggestions: [] }),
   ]);
   const generatedEntry =
     generatedResult.status === "fulfilled" ? generatedResult.value : null;
-  const merriamEntry =
-    merriamResult.status === "fulfilled" ? merriamResult.value : null;
+  const merriamLookup =
+    merriamResult.status === "fulfilled"
+      ? merriamResult.value
+      : { entry: null, suggestions: [] };
 
-  if (generatedEntry) {
+  if (!merriamLookup.entry && merriamLookup.suggestions.length > 0) {
     return {
-      ...generatedEntry,
-      pronunciations: merriamEntry?.pronunciations ?? [],
+      entry: null,
+      suggestions: merriamLookup.suggestions,
     };
   }
 
-  if (merriamEntry) {
-    return merriamEntry;
+  if (generatedEntry) {
+    return {
+      entry: {
+        ...generatedEntry,
+        pronunciations: merriamLookup.entry?.pronunciations ?? [],
+      },
+      suggestions: [],
+    };
+  }
+
+  if (merriamLookup.entry) {
+    return {
+      entry: merriamLookup.entry,
+      suggestions: [],
+    };
   }
 
   if (generatedResult.status === "rejected") {
@@ -35,5 +53,14 @@ export async function lookupVocabEntry(
     throw merriamResult.reason;
   }
 
-  return null;
+  return {
+    entry: null,
+    suggestions: merriamLookup.suggestions,
+  };
+}
+
+export async function lookupVocabEntry(
+  query: string,
+): Promise<DictionaryEntry | null> {
+  return (await lookupVocab(query)).entry;
 }

@@ -7,7 +7,6 @@ import {
   mapVocabRowToPersistedItem,
   type VocabRow,
 } from "@/lib/persisted-state";
-import { normalizeQuery } from "@/lib/mock-state";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
 import {
   createFallbackReviewState,
@@ -19,7 +18,8 @@ import {
   AI_VOCAB_PROMPT_VERSION,
   getContentGenerationAttemptVersion,
 } from "@/lib/vocab-enrichment";
-import { lookupVocabEntry } from "@/lib/vocab-lookup";
+import { lookupVocab } from "@/lib/vocab-lookup";
+import { validateVocabQuery } from "@/lib/vocab-query";
 import { isDue, NEW_WORD_DUE_CARD_LIMIT } from "@/lib/review";
 
 function getPersistedContent(entry: DictionaryEntry) {
@@ -108,23 +108,36 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as { query?: string };
     const originalQuery = body.query?.trim() ?? "";
-    const normalizedQuery = normalizeQuery(originalQuery);
+    const validation = validateVocabQuery(originalQuery);
 
-    if (!normalizedQuery) {
+    if (validation.message) {
       return NextResponse.json(
         {
-          outcome: "empty_query",
+          outcome: originalQuery ? "invalid_query" : "empty_query",
           entry: null,
           vocab: null,
-          message: "Type a word or short phrase before searching.",
+          message: validation.message,
           profile: mapProfileRowToState(profile),
         },
         { status: 400 },
       );
     }
+    const normalizedQuery = validation.normalizedQuery;
 
-    const entry = await lookupVocabEntry(normalizedQuery);
+    const lookup = await lookupVocab(normalizedQuery);
+    const entry = lookup.entry;
     if (!entry) {
+      if (lookup.suggestions.length > 0) {
+        return NextResponse.json({
+          outcome: "suggestion",
+          entry: null,
+          vocab: null,
+          suggestions: lookup.suggestions,
+          message: "No exact match. Did you mean one of these?",
+          profile: mapProfileRowToState(profile),
+        });
+      }
+
       return NextResponse.json(
         {
           outcome: "not_found",

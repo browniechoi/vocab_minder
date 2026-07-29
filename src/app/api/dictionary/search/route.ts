@@ -1,29 +1,42 @@
 import { NextResponse } from "next/server";
 import { lookupMerriamEntry } from "@/lib/merriam";
-import { lookupVocabEntry } from "@/lib/vocab-lookup";
+import { lookupVocab } from "@/lib/vocab-lookup";
+import { validateVocabQuery } from "@/lib/vocab-query";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.trim() ?? "";
   const pronunciationOnly = searchParams.get("pronunciationOnly") === "1";
 
-  if (!query) {
+  const validation = validateVocabQuery(query);
+  if (validation.message) {
     return NextResponse.json(
-      { entry: null, message: "Missing query." },
+      { entry: null, message: validation.message, suggestions: [] },
       { status: 400 },
     );
   }
 
   try {
-    const entry = pronunciationOnly
-      ? process.env.MERRIAM_API_KEY
-        ? await lookupMerriamEntry(query, process.env.MERRIAM_API_KEY)
-        : null
-      : await lookupVocabEntry(query);
+    if (pronunciationOnly) {
+      const entry = process.env.MERRIAM_API_KEY
+        ? await lookupMerriamEntry(
+            validation.normalizedQuery,
+            process.env.MERRIAM_API_KEY,
+          )
+        : null;
 
+      return NextResponse.json({ entry, message: null, suggestions: [] });
+    }
+
+    const lookup = await lookupVocab(validation.normalizedQuery);
     return NextResponse.json({
-      entry,
-      message: null,
+      entry: lookup.entry,
+      message: lookup.entry
+        ? null
+        : lookup.suggestions.length > 0
+          ? "No exact match. Did you mean one of these?"
+          : null,
+      suggestions: lookup.suggestions,
     });
   } catch (error) {
     return NextResponse.json(
