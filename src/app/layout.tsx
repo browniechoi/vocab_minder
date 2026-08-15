@@ -30,7 +30,7 @@ export default async function RootLayout({
 }>) {
   const authConfigured = hasSupabaseEnv();
   let authUserEmail: string | null = null;
-  let storageScope = "guest";
+  let authenticated = false;
 
   if (authConfigured) {
     const supabase = await createClient();
@@ -39,10 +39,8 @@ export default async function RootLayout({
     } = await supabase.auth.getUser();
 
     authUserEmail = user?.email ?? null;
-    storageScope = user?.id ?? "guest";
+    authenticated = Boolean(user);
   }
-
-  const remotePersistenceEnabled = authConfigured && storageScope !== "guest";
 
   return (
     <html
@@ -50,15 +48,10 @@ export default async function RootLayout({
       className={`${spaceGrotesk.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AppStateProvider
-          key={storageScope}
-          remotePersistenceEnabled={remotePersistenceEnabled}
-          storageScope={storageScope}
-        >
+        <AppStateProvider authenticated={authenticated}>
           <AppShell
             authConfigured={authConfigured}
             authUserEmail={authUserEmail}
-            remotePersistenceEnabled={remotePersistenceEnabled}
           >
             {children}
           </AppShell>

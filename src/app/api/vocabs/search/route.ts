@@ -16,7 +16,6 @@ import {
 } from "@/lib/supabase/review-data";
 import {
   AI_VOCAB_PROMPT_VERSION,
-  getContentGenerationAttemptVersion,
 } from "@/lib/vocab-enrichment";
 import { lookupVocab } from "@/lib/vocab-lookup";
 import { validateVocabQuery } from "@/lib/vocab-query";
@@ -47,11 +46,6 @@ function getPersistedContent(entry: DictionaryEntry) {
     content_prompt_version: entry.contentPromptVersion ?? null,
     content_generated_at: entry.contentGeneratedAt ?? null,
     content_edited_at: null,
-    content_generation_attempt_version:
-      getContentGenerationAttemptVersion(entry),
-    content_generation_attempted_at:
-      entry.contentGeneratedAt ?? null,
-    content_generation_error: null,
   };
 }
 
@@ -106,8 +100,12 @@ export async function POST(request: Request) {
       return errorResponse;
     }
 
-    const body = (await request.json()) as { query?: string };
+    const body = (await request.json()) as {
+      forceExact?: unknown;
+      query?: string;
+    };
     const originalQuery = body.query?.trim() ?? "";
+    const forceExact = body.forceExact === true;
     const validation = validateVocabQuery(originalQuery);
 
     if (validation.message) {
@@ -124,7 +122,7 @@ export async function POST(request: Request) {
     }
     const normalizedQuery = validation.normalizedQuery;
 
-    const lookup = await lookupVocab(normalizedQuery);
+    const lookup = await lookupVocab(normalizedQuery, forceExact);
     const entry = lookup.entry;
     if (!entry) {
       if (lookup.suggestions.length > 0) {

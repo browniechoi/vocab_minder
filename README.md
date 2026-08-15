@@ -10,10 +10,8 @@ VocabMinder is a staging-ready vocabulary web app for English learners:
 - searched forms remain distinct learning targets, while related forms share lemma-based family metadata
 - AI content includes grammatical role, practical usage guidance, and common collocations
 
-The current implementation is intentionally split in two:
-
-- signed-in users sync profile state, vocab items, review schedules, and review history through `Supabase`
-- guest mode still falls back to a runnable local preview data layer
+Authentication is required. Supabase is the single source of truth for profile
+state, vocabulary, review schedules, and review history.
 
 ## Run locally
 
@@ -29,7 +27,7 @@ Then open [http://localhost:3000](http://localhost:3000).
 - `/` search and dashboard
 - `/review` flashcard review queue
 - `/vocab` active and archived vocab management
-- `/settings` plan controls, cloud service choices, and environment checklist
+- `/settings` account usage and review-data reset
 - `/login` Supabase email/password auth entry point
 - `/auth/confirm` email confirmation handler
 
@@ -38,7 +36,7 @@ Then open [http://localhost:3000](http://localhost:3000).
 - `.env.example` documents the environment contract
 - `supabase/migrations` is now the source of truth for the initial database model
 - `src/lib/supabase/*` wires SSR auth, middleware, and clients
-- `src/app/api/app-state`, `src/app/api/vocabs/*`, and `src/app/api/review/*` now back the signed-in product loop
+- `src/app/api/app-state`, `src/app/api/vocabs/*`, and `src/app/api/review/*` back the signed-in product loop
 
 ## Recommended services
 

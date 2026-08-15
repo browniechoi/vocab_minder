@@ -13,15 +13,23 @@ export function getSupabaseEnv() {
 export function hasSupabaseEnv() {
   const { url, publishableKey } = getSupabaseEnv();
 
-  return Boolean(url && publishableKey);
+  if (!url || !publishableKey?.trim()) {
+    return false;
+  }
+
+  try {
+    return ["http:", "https:"].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
 }
 
 export function getRequiredSupabaseEnv() {
   const { url, publishableKey } = getSupabaseEnv();
 
-  if (!url || !publishableKey) {
+  if (!hasSupabaseEnv() || !url || !publishableKey) {
     throw new Error(
-      "Missing Supabase environment. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+      "Invalid Supabase environment. Set a valid NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
     );
   }
 

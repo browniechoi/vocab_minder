@@ -7,7 +7,10 @@ export type VocabLookupResult = {
   suggestions: string[];
 };
 
-export async function lookupVocab(query: string): Promise<VocabLookupResult> {
+export async function lookupVocab(
+  query: string,
+  forceExact = false,
+): Promise<VocabLookupResult> {
   const merriamApiKey = process.env.MERRIAM_API_KEY;
   const [generatedResult, merriamResult] = await Promise.allSettled([
     generateVocabEntry(query),
@@ -22,7 +25,11 @@ export async function lookupVocab(query: string): Promise<VocabLookupResult> {
       ? merriamResult.value
       : { entry: null, suggestions: [] };
 
-  if (!merriamLookup.entry && merriamLookup.suggestions.length > 0) {
+  if (
+    !forceExact &&
+    !merriamLookup.entry &&
+    merriamLookup.suggestions.length > 0
+  ) {
     return {
       entry: null,
       suggestions: merriamLookup.suggestions,
@@ -55,12 +62,6 @@ export async function lookupVocab(query: string): Promise<VocabLookupResult> {
 
   return {
     entry: null,
-    suggestions: merriamLookup.suggestions,
+    suggestions: forceExact ? [] : merriamLookup.suggestions,
   };
-}
-
-export async function lookupVocabEntry(
-  query: string,
-): Promise<DictionaryEntry | null> {
-  return (await lookupVocab(query)).entry;
 }

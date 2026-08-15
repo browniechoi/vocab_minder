@@ -1,8 +1,6 @@
 import {
-  AI_VOCAB_PROMPT_VERSION,
   type AiVocabProvider,
   GENERATED_VOCAB_SCHEMA,
-  getGenerationAttemptVersion,
   type GeneratedVocabContent,
   type VocabGenerationResult,
   VOCAB_SYSTEM_PROMPT,
@@ -11,9 +9,7 @@ import {
 export type Environment = Record<string, string | undefined>;
 
 export type VocabGenerationTarget = {
-  attemptVersion: string;
   model: string;
-  promptVersion: string;
   provider: AiVocabProvider;
 };
 
@@ -119,22 +115,9 @@ export function getVocabGenerationTarget(
   }
 
   return {
-    attemptVersion: getGenerationAttemptVersion(provider, model),
     model,
-    promptVersion: AI_VOCAB_PROMPT_VERSION,
     provider,
   };
-}
-
-export function isVocabGenerationConfigured(
-  environment: Environment = process.env,
-) {
-  try {
-    getVocabGenerationTarget(environment);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function generateWithGemini(

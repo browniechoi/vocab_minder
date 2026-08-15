@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signInAction, signUpAction } from "@/lib/auth/actions";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
@@ -33,12 +32,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           Auth
         </p>
         <h1 className="mt-3 text-4xl font-semibold leading-tight text-[color:var(--color-foreground)]">
-          Sign in before the app stops pretending to be single-user.
+          Sign in to VocabMinder.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[color:var(--color-muted)]">
-          This slice wires Supabase SSR auth and cookie-based sessions into the
-          app. Signed-in accounts now sync their vocab library, review
-          schedule, review history, and plan state through Supabase.
+          Your vocabulary, review schedule, and history sync through Supabase.
         </p>
       </div>
 
@@ -136,11 +133,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   className="mt-2 h-12 w-full rounded-2xl border border-[color:var(--color-border)] bg-white px-4 text-sm text-[color:var(--color-foreground)] outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus:border-[color:var(--color-accent)]"
                 />
               </label>
-              <p className="text-sm leading-7 text-[color:var(--color-muted)]">
-                This uses email/password first because it is the lowest-friction
-                path to a credible staging and production setup. Social auth can
-                come later without changing the data model.
-              </p>
               <button
                 type="submit"
                 className="rounded-full border border-[color:var(--color-border)] px-5 py-3 text-sm font-medium text-[color:var(--color-foreground)] transition-colors hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
@@ -152,13 +144,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
       </div>
 
-      <p className="text-sm leading-7 text-[color:var(--color-muted)]">
-        Need to inspect the live product loop first? Go back to{" "}
-        <Link href="/" className="text-[color:var(--color-accent)] underline">
-          the dashboard
-        </Link>
-        .
-      </p>
     </section>
   );
 }

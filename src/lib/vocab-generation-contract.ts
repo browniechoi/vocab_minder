@@ -141,11 +141,3 @@ export const VOCAB_SYSTEM_PROMPT = [
   "commonCollocations must be natural, frequent-looking combinations that include canonicalTerm exactly.",
   "If the query is not a real English word or established phrase, set isValidVocabulary to false and return empty values for the remaining fields.",
 ].join(" ");
-
-export function getGenerationAttemptVersion(
-  provider: AiVocabProvider,
-  model: string,
-  promptVersion = AI_VOCAB_PROMPT_VERSION,
-) {
-  return `${provider}:${model}:${promptVersion}`;
-}

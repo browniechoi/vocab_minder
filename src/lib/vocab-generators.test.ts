@@ -10,10 +10,7 @@ test("selects the high-throughput Gemini model by default", () => {
   });
 
   assert.deepEqual(target, {
-    attemptVersion:
-      "gemini:gemini-3.5-flash-lite:2026-07-25-v3",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "2026-07-25-v3",
     provider: "gemini",
   });
 });
@@ -27,10 +24,6 @@ test("keeps OpenAI as an explicit alternative", () => {
 
   assert.equal(target.provider, "openai");
   assert.equal(target.model, "gpt-test");
-  assert.equal(
-    target.attemptVersion,
-    "openai:gpt-test:2026-07-25-v3",
-  );
 });
 
 test("rejects a selected provider without its matching key", () => {

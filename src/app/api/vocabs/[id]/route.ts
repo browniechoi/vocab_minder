@@ -6,8 +6,8 @@ import {
   mapVocabRowToPersistedItem,
   type VocabRow,
 } from "@/lib/persisted-state";
-import { normalizeQuery } from "@/lib/mock-state";
 import { getAuthenticatedContext } from "@/lib/supabase/route";
+import { normalizeVocabTerm } from "@/lib/vocab-query";
 
 export async function PATCH(
   request: Request,
@@ -41,7 +41,9 @@ export async function PATCH(
     const definition = body.definition?.trim() ?? "";
     const exampleSentence = body.exampleSentence?.trim() ?? "";
     const grammaticalRole = body.grammaticalRole?.trim();
-    const normalizedTerm = canonicalTerm ? normalizeQuery(canonicalTerm) : "";
+    const normalizedTerm = canonicalTerm
+      ? normalizeVocabTerm(canonicalTerm)
+      : "";
     const partOfSpeech = body.partOfSpeech?.trim();
     const usageNote = body.usageNote?.trim();
     const acceptedAnswers = Array.isArray(body.acceptedAnswers)
@@ -169,7 +171,6 @@ export async function PATCH(
           : {}),
         content_provider: "manual",
         content_edited_at: new Date().toISOString(),
-        content_generation_error: null,
       })
       .eq("id", id)
       .select(VOCAB_ROW_SELECT)

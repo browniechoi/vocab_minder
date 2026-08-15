@@ -34,7 +34,6 @@ export function SearchPanel() {
     activeItems,
     archivedItems,
     dueItems,
-    remotePersistenceEnabled,
     reviewsToday,
     search,
     state,
@@ -43,6 +42,7 @@ export function SearchPanel() {
   const [lastResult, setLastResult] = useState<
     Awaited<ReturnType<typeof search>> | null
   >(null);
+  const [lastSubmittedQuery, setLastSubmittedQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
   const usagePercent = Math.min(
@@ -50,10 +50,12 @@ export function SearchPanel() {
     Math.round((activeCount / state.activeLimit) * 100),
   );
 
-  async function runSearch(nextQuery: string) {
+  async function runSearch(nextQuery: string, forceExact = false) {
+    const submittedQuery = nextQuery.trim();
+    setLastSubmittedQuery(submittedQuery);
     setIsSearching(true);
     try {
-      setLastResult(await search(nextQuery));
+      setLastResult(await search(submittedQuery, forceExact));
     } finally {
       setIsSearching(false);
     }
@@ -71,9 +73,8 @@ export function SearchPanel() {
               One search box. No separate save step.
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[color:var(--color-muted)]">
-              {remotePersistenceEnabled
-                ? "Search captures new words automatically when your review queue is under control, then syncs them to Supabase."
-                : "Search captures new words automatically when your review queue is under control. Sign in to sync across devices."}
+              Search captures new words automatically when your review queue is
+              under control, then syncs them to Supabase.
             </p>
           </div>
 
@@ -142,6 +143,14 @@ export function SearchPanel() {
                       {suggestion}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    disabled={isSearching || !lastSubmittedQuery}
+                    onClick={() => void runSearch(lastSubmittedQuery, true)}
+                    className="rounded-full border border-[color:var(--color-foreground)] bg-[color:var(--color-foreground)] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Search exact “{lastSubmittedQuery}”
+                  </button>
                 </div>
               ) : null}
               {lastResult.entry ? (
@@ -203,9 +212,8 @@ export function SearchPanel() {
             </div>
           ) : (
             <div className="rounded-[24px] border border-dashed border-[color:var(--color-border)] px-5 py-5 text-sm leading-7 text-[color:var(--color-muted)]">
-              {remotePersistenceEnabled
-                ? "Search generates learner-focused content through the app server, adds Merriam-Webster pronunciation when available, and syncs successful results to Supabase."
-                : "Search generates learner-focused content through the app server. Sign in when you want the vocab library to sync to Supabase instead of staying local."}
+              Search generates learner-focused content, adds pronunciation when
+              available, and saves successful results.
             </div>
           )}
         </div>
@@ -230,11 +238,7 @@ export function SearchPanel() {
         <MetricCard
           label="Reviews Today"
           value={`${reviewsToday}`}
-          detail={
-            remotePersistenceEnabled
-              ? "Logged answers synced to your account."
-              : "Logged answers in this local preview session."
-          }
+          detail="Logged answers synced to your account."
         />
       </div>
 

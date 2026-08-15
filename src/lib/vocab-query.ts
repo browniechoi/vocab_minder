@@ -11,12 +11,15 @@ export type VocabQueryValidation =
       normalizedQuery: "";
     };
 
-function normalizeQuery(query: string) {
-  return query
-    .trim()
+export function normalizeVocabTerm(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’‘]/g, "'")
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function validateVocabQuery(query: string): VocabQueryValidation {
@@ -45,7 +48,7 @@ export function validateVocabQuery(query: string): VocabQueryValidation {
     };
   }
 
-  const normalizedQuery = normalizeQuery(trimmed);
+  const normalizedQuery = normalizeVocabTerm(trimmed);
   const words = normalizedQuery.split(" ").filter(Boolean);
   if (
     !/[a-z]/u.test(normalizedQuery) ||

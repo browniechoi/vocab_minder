@@ -309,7 +309,3 @@ export async function lookupMerriam(query: string, apiKey: string) {
     suggestions: getMerriamSuggestions(payload),
   };
 }
-
-export async function lookupMerriamEntry(query: string, apiKey: string) {
-  return (await lookupMerriam(query, apiKey)).entry;
-}

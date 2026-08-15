@@ -133,11 +133,6 @@ export type ProfileState = {
   activeLimit: number;
 };
 
-export type ReviewCache = {
-  reviewCards: ReviewCard[];
-  reviewEvents: ReviewEvent[];
-};
-
 export type AppState = {
   planTier: PlanTier;
   activeLimit: number;

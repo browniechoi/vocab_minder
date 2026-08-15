@@ -7,7 +7,6 @@ import type {
   ReviewCard,
   ReviewCardType,
   ReviewEvent,
-  ReviewCache,
   ReviewMemoryState,
   ReviewRating,
   ReviewState,
@@ -218,21 +217,6 @@ export function attachReviewState(
   };
 }
 
-export function mergePersistedItemsWithReviewCache(
-  items: PersistedVocabItem[],
-  reviewCache: ReviewCache,
-): VocabItem[] {
-  return items.map((item) =>
-    attachReviewState(
-      item,
-      reviewCache.reviewCards.find(
-        (card) =>
-          card.vocabItemId === item.id && card.cardType === "recognition",
-      )?.reviewState,
-    ),
-  );
-}
-
 export function mapReviewStateRow(row: ReviewStateRow): ReviewState {
   return normalizeReviewState({
     dueAt: row.due_at,
@@ -276,12 +260,5 @@ export function mapReviewEventRow(
     reviewedAt: row.reviewed_at,
     previousDueAt: row.previous_due_at,
     newDueAt: row.new_due_at,
-  };
-}
-
-export function buildReviewCache(state: AppState): ReviewCache {
-  return {
-    reviewCards: state.reviewCards,
-    reviewEvents: state.reviewEvents,
   };
 }

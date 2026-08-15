@@ -2,20 +2,18 @@ import type { DictionaryEntry } from "@/lib/app-types";
 import { buildClozeFromAnswer } from "@/lib/cloze";
 import {
   AI_VOCAB_PROMPT_VERSION,
-  getGenerationAttemptVersion,
   type GeneratedVocabContent,
 } from "@/lib/vocab-generation-contract";
 import {
   type Environment,
   generateVocabContent,
   getVocabGenerationTarget,
-  isVocabGenerationConfigured,
 } from "@/lib/vocab-generators";
+import { normalizeVocabTerm } from "@/lib/vocab-query";
 
 export {
   AI_VOCAB_PROMPT_VERSION,
   getVocabGenerationTarget,
-  isVocabGenerationConfigured,
 };
 
 function clampText(value: unknown, maxLength: number) {
@@ -26,19 +24,8 @@ function clampText(value: unknown, maxLength: number) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
-function normalizeTerm(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[’‘]/g, "'")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function buildWordFamilyKey(lemma: string) {
-  return normalizeTerm(lemma).replace(/\s+/g, "-");
+  return normalizeVocabTerm(lemma).replace(/\s+/g, "-");
 }
 
 function normalizeStringArray(
@@ -55,7 +42,7 @@ function normalizeStringArray(
 
   for (const item of value) {
     const text = clampText(item, maxItemLength);
-    const key = normalizeTerm(text);
+    const key = normalizeVocabTerm(text);
     if (!text || !key || seen.has(key)) {
       continue;
     }
@@ -82,16 +69,18 @@ function toDictionaryEntry(
 
   const answerLemma = clampText(generated.answerLemma, 120);
   const canonicalTerm = clampText(generated.canonicalTerm, 120);
-  const normalizedTerm = normalizeTerm(canonicalTerm);
-  const normalizedQuery = normalizeTerm(query);
+  const normalizedTerm = normalizeVocabTerm(canonicalTerm);
+  const normalizedQuery = normalizeVocabTerm(query);
   const definition = clampText(generated.definition, 420);
   const exampleSentence = clampText(generated.exampleSentence, 420);
   const clozeAnswer = clampText(generated.clozeAnswer, 120);
   const clozeSentence = buildClozeFromAnswer(exampleSentence, clozeAnswer);
   const wordFamilyKey = buildWordFamilyKey(answerLemma);
   const senseKey =
-    normalizeTerm(clampText(generated.senseKey, 120)).replace(/\s+/g, "-") ||
-    "primary";
+    normalizeVocabTerm(clampText(generated.senseKey, 120)).replace(
+      /\s+/g,
+      "-",
+    ) || "primary";
 
   if (
     !answerLemma ||
@@ -125,7 +114,7 @@ function toDictionaryEntry(
     [query, canonicalTerm, answerLemma, ...generated.lookupKeys],
     20,
     120,
-  ).map(normalizeTerm);
+  ).map(normalizeVocabTerm);
 
   return {
     canonicalTerm,
@@ -168,25 +157,5 @@ export async function generateVocabEntry(
     generated.provider,
     generated.model,
     generated.content,
-  );
-}
-
-export function getContentGenerationAttemptVersion(
-  entry: Pick<
-    DictionaryEntry,
-    "contentModel" | "contentPromptVersion" | "contentProvider"
-  >,
-) {
-  if (
-    entry.contentProvider !== "gemini" &&
-    entry.contentProvider !== "openai"
-  ) {
-    return entry.contentPromptVersion ?? null;
-  }
-
-  return getGenerationAttemptVersion(
-    entry.contentProvider,
-    entry.contentModel ?? "unknown-model",
-    entry.contentPromptVersion ?? AI_VOCAB_PROMPT_VERSION,
   );
 }

@@ -6,20 +6,18 @@ import { signOutAction } from "@/lib/auth/actions";
 export function AppShell({
   authConfigured,
   authUserEmail,
-  remotePersistenceEnabled,
   children,
 }: {
   authConfigured: boolean;
   authUserEmail: string | null;
-  remotePersistenceEnabled: boolean;
   children: React.ReactNode;
 }) {
-  const syncLabel = remotePersistenceEnabled
+  const syncLabel = authUserEmail
     ? "Synced"
     : authConfigured
-      ? "Local"
+      ? "Signed out"
       : "Setup needed";
-  const syncClass = remotePersistenceEnabled
+  const syncClass = authUserEmail
     ? "bg-[color:var(--color-accent-secondary)]"
     : authConfigured
       ? "bg-[color:var(--color-warning)]"
@@ -48,12 +46,14 @@ export function AppShell({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-              <nav className="flex flex-wrap gap-1.5">
-                <NavLink href="/">Dashboard</NavLink>
-                <NavLink href="/review">Review</NavLink>
-                <NavLink href="/vocab">Vocabulary</NavLink>
-                <NavLink href="/settings">Settings</NavLink>
-              </nav>
+              {authUserEmail ? (
+                <nav className="flex flex-wrap gap-1.5">
+                  <NavLink href="/">Dashboard</NavLink>
+                  <NavLink href="/review">Review</NavLink>
+                  <NavLink href="/vocab">Vocabulary</NavLink>
+                  <NavLink href="/settings">Settings</NavLink>
+                </nav>
+              ) : null}
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 {authUserEmail ? (
                   <>

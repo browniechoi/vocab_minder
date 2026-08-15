@@ -32,7 +32,29 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const path = request.nextUrl.pathname;
+  const isPublicPage =
+    path === "/login" ||
+    path.startsWith("/auth/confirm") ||
+    path.startsWith("/auth/error");
+  const redirect = (pathname: string) => {
+    const nextResponse = NextResponse.redirect(new URL(pathname, request.url));
+    response.cookies
+      .getAll()
+      .forEach((cookie) => nextResponse.cookies.set(cookie));
+    return nextResponse;
+  };
+
+  if (!user && !isPublicPage && !path.startsWith("/api/")) {
+    return redirect("/login");
+  }
+
+  if (user && path === "/login") {
+    return redirect("/");
+  }
 
   return response;
 }

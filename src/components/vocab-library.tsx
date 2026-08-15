@@ -16,7 +16,6 @@ export function VocabLibrary() {
     archiveItem,
     archivedItems,
     deleteItem,
-    remotePersistenceEnabled,
     restoreItem,
     updateVocabBack,
   } = useAppState();
@@ -449,9 +448,7 @@ export function VocabLibrary() {
                           if (shouldDelete) {
                             void deleteItem(item.id);
                             setRestoreMessage(
-                              remotePersistenceEnabled
-                                ? `"${item.canonicalTerm}" was deleted from Supabase and removed from this review browser state.`
-                                : `"${item.canonicalTerm}" was deleted from local preview data.`,
+                              `"${item.canonicalTerm}" was permanently deleted.`,
                             );
                           }
                         }}
@@ -481,9 +478,7 @@ export function VocabLibrary() {
                           if (shouldDelete) {
                             void deleteItem(item.id);
                             setRestoreMessage(
-                              remotePersistenceEnabled
-                                ? `"${item.canonicalTerm}" was deleted from Supabase and removed from this review browser state.`
-                                : `"${item.canonicalTerm}" was deleted from local preview data.`,
+                              `"${item.canonicalTerm}" was permanently deleted.`,
                             );
                           }
                         }}
